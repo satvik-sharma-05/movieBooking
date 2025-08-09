@@ -23,7 +23,7 @@ app.use(cors());
 
 // Routes
 app.get('/', (_, res) => {
-  res.send('Serever is Live!');
+  res.send('Server is Live!');
 });
 
 app.listen(PORT, () => {
