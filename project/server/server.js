@@ -32,7 +32,7 @@ app.use(cors());
 app.get('/', (_, res) => {
   res.send('Server is Live!');
 });
-
+app.get('/favicon.ico', (_, res) => res.status(204).end());
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
