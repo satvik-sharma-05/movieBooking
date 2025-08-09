@@ -1,13 +1,8 @@
 import { Inngest } from "inngest";
 import User from "../models/user.model.js";
-
 import { createClerkClient } from "@clerk/backend";
 
-
-
 export const inngest = new Inngest({ id: "my-app" });
-
-// Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 /**
@@ -16,35 +11,37 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 export const syncUserCreation = inngest.createFunction(
   { id: "sync-user-creation", name: "Sync User Creation" },
   { event: "clerk/user.created" },
-  async ({ event }) => {
-    console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
-
-    const minimalUser = event.data;
-    if (!minimalUser || !minimalUser.id) {
+  async ({ event, step }) => {
+    const clerkId = event.data?.id;
+    if (!clerkId) {
       console.warn("⚠️ Missing user ID in event");
       return { success: false, error: "Missing user ID" };
     }
 
-    try {
-      const fullUser = await clerk.users.getUser(minimalUser.id);
+    // Step 1: Fetch full user from Clerk
+    const fullUser = await step.run("fetch-user", async () => {
+      return await clerk.users.getUser(clerkId);
+    });
 
-      const email = fullUser.emailAddresses?.[0]?.emailAddress || "";
-      const image = fullUser.imageUrl || minimalUser.image_url || "";
+    // Step 2: Prepare user data
+    const userData = {
+      clerkId: fullUser.id,
+      name: `${fullUser.firstName ?? ""} ${fullUser.lastName ?? ""}`.trim(),
+      email: fullUser.emailAddresses?.[0]?.emailAddress ?? "",
+      image: fullUser.imageUrl ?? event.data.image_url ?? "",
+    };
 
-      const userData = {
-        clerkId: fullUser.id,
-        name: `${fullUser.firstName} ${fullUser.lastName}`,
-        email,
-        image,
-      };
+    // Step 3: Upsert into MongoDB
+    await step.run("write-user", async () => {
+      await User.updateOne(
+        { clerkId: userData.clerkId },
+        { $set: userData },
+        { upsert: true }
+      );
+    });
 
-      await User.create(userData);
-      console.log("✅ User created successfully:", userData);
-      return { success: true };
-    } catch (error) {
-      console.error("❌ Error syncing user creation:", error);
-      throw error;
-    }
+    console.log("✅ User created or updated:", userData);
+    return { success: true };
   }
 );
 
@@ -54,31 +51,29 @@ export const syncUserCreation = inngest.createFunction(
 export const syncUserUpdate = inngest.createFunction(
   { id: "sync-user-update", name: "Sync User Update" },
   { event: "clerk/user.updated" },
-  async ({ event }) => {
-    console.log("📦 Incoming clerk/user.updated event:", JSON.stringify(event, null, 2));
-
-    const minimalUser = event.data;
-    if (!minimalUser || !minimalUser.id) {
+  async ({ event, step }) => {
+    const clerkId = event.data?.id;
+    if (!clerkId) {
       console.warn("⚠️ Missing user ID in event");
       return { success: false, error: "Missing user ID" };
     }
 
-    try {
-      const fullUser = await clerk.users.getUser(minimalUser.id);
+    const fullUser = await step.run("fetch-user", async () => {
+      return await clerk.users.getUser(clerkId);
+    });
 
-      const updatedUserData = {
-        name: `${fullUser.firstName} ${fullUser.lastName}`,
-        email: fullUser.emailAddresses?.[0]?.emailAddress || "",
-        image: fullUser.imageUrl || minimalUser.image_url || "",
-      };
+    const updatedUserData = {
+      name: `${fullUser.firstName ?? ""} ${fullUser.lastName ?? ""}`.trim(),
+      email: fullUser.emailAddresses?.[0]?.emailAddress ?? "",
+      image: fullUser.imageUrl ?? event.data.image_url ?? "",
+    };
 
+    await step.run("update-user", async () => {
       await User.findOneAndUpdate({ clerkId: fullUser.id }, updatedUserData, { new: true });
-      console.log("✅ User updated successfully:", updatedUserData);
-      return { success: true };
-    } catch (error) {
-      console.error("❌ Error syncing user update:", error);
-      throw error;
-    }
+    });
+
+    console.log("✅ User updated:", updatedUserData);
+    return { success: true };
   }
 );
 
@@ -88,23 +83,19 @@ export const syncUserUpdate = inngest.createFunction(
 export const syncUserDeletion = inngest.createFunction(
   { id: "sync-user-deletion", name: "Sync User Deletion" },
   { event: "clerk/user.deleted" },
-  async ({ event }) => {
-    console.log("📦 Incoming clerk/user.deleted event:", JSON.stringify(event, null, 2));
-
-    const minimalUser = event.data;
-    if (!minimalUser || !minimalUser.id) {
+  async ({ event, step }) => {
+    const clerkId = event.data?.id;
+    if (!clerkId) {
       console.warn("⚠️ Missing user ID in event");
       return { success: false, error: "Missing user ID" };
     }
 
-    try {
-      await User.findOneAndDelete({ clerkId: minimalUser.id });
-      console.log("✅ User deleted successfully:", minimalUser.id);
-      return { success: true };
-    } catch (error) {
-      console.error("❌ Error syncing user deletion:", error);
-      throw error;
-    }
+    await step.run("delete-user", async () => {
+      await User.findOneAndDelete({ clerkId });
+    });
+
+    console.log("✅ User deleted:", clerkId);
+    return { success: true };
   }
 );
 
