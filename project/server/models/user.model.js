@@ -1,8 +1,10 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
+
 const userSchema = new mongoose.Schema({
-    _id: {
-    type: mongoose.Schema.Types.ObjectId,
-    auto: true, // Automatically generate ObjectId
+  clerkId: {
+    type: String,
+    required: true,
+    unique: true,
   },
   name: {
     type: String,
@@ -15,10 +17,10 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
   },
-  image : {
+  image: {
     type: String,
     required: true,
-  } 
+  }
 });
 
 const User = mongoose.model("User", userSchema);

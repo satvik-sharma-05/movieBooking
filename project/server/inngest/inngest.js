@@ -22,13 +22,13 @@ export const syncUserCreation = inngest.createFunction(
 
       const { id, firstName, lastName, emailAddresses, imageUrl } = user;
       const userData = {
-        _id: id,
+        clerkId: id,
         name: `${firstName} ${lastName}`,
         email: emailAddresses?.[0]?.emailAddress || "",
         image: imageUrl || "",
       };
 
-      await User.create(userData);
+      await User.create(userData); // ✅ Only one call here
       console.log("✅ User created successfully:", userData);
       return { success: true };
     } catch (error) {
@@ -42,59 +42,59 @@ export const syncUserCreation = inngest.createFunction(
  * 🔄 Sync user updates from Clerk to your database
  */
 export const syncUserUpdate = inngest.createFunction(
-  { id: "sync-user-update", name: "Sync User Update" },
-  { event: "clerk/user.updated" },
-  async ({ event }) => {
-    try {
-      console.log("📦 Incoming clerk/user.updated event:", JSON.stringify(event, null, 2));
+    { id: "sync-user-update", name: "Sync User Update" },
+    { event: "clerk/user.updated" },
+    async ({ event }) => {
+        try {
+            console.log("📦 Incoming clerk/user.updated event:", JSON.stringify(event, null, 2));
 
-      const user = event.data?.user;
-      if (!user || !user.id) {
-        console.warn("⚠️ Missing user data in clerk/user.updated event:", event);
-        return { success: false, error: "Missing user data" };
-      }
+            const user = event.data?.user;
+            if (!user || !user.id) {
+                console.warn("⚠️ Missing user data in clerk/user.updated event:", event);
+                return { success: false, error: "Missing user data" };
+            }
 
-      const { id, firstName, lastName, emailAddresses, imageUrl } = user;
-      const updatedUserData = {
-        name: `${firstName} ${lastName}`,
-        email: emailAddresses?.[0]?.emailAddress || "",
-        image: imageUrl || "",
-      };
+            const { id, firstName, lastName, emailAddresses, imageUrl } = user;
+            const updatedUserData = {
+                name: `${firstName} ${lastName}`,
+                email: emailAddresses?.[0]?.emailAddress || "",
+                image: imageUrl || "",
+            };
 
-      await User.findByIdAndUpdate(id, updatedUserData, { new: true });
-      console.log("✅ User updated successfully:", updatedUserData);
-      return { success: true };
-    } catch (error) {
-      console.error("❌ Error syncing user update:", error);
-      throw error;
+            await User.findOneAndUpdate({ clerkId: id }, updatedUserData, { new: true });
+            console.log("✅ User updated successfully:", updatedUserData);
+            return { success: true };
+        } catch (error) {
+            console.error("❌ Error syncing user update:", error);
+            throw error;
+        }
     }
-  }
 );
 
 /**
  * 🗑️ Sync user deletion from Clerk to your database
  */
 export const syncUserDeletion = inngest.createFunction(
-  { id: "sync-user-deletion", name: "Sync User Deletion" },
-  { event: "clerk/user.deleted" },
-  async ({ event }) => {
-    try {
-      console.log("📦 Incoming clerk/user.deleted event:", JSON.stringify(event, null, 2));
+    { id: "sync-user-deletion", name: "Sync User Deletion" },
+    { event: "clerk/user.deleted" },
+    async ({ event }) => {
+        try {
+            console.log("📦 Incoming clerk/user.deleted event:", JSON.stringify(event, null, 2));
 
-      const user = event.data?.user;
-      if (!user || !user.id) {
-        console.warn("⚠️ Missing user data in clerk/user.deleted event:", event);
-        return { success: false, error: "Missing user data" };
-      }
+            const user = event.data?.user;
+            if (!user || !user.id) {
+                console.warn("⚠️ Missing user data in clerk/user.deleted event:", event);
+                return { success: false, error: "Missing user data" };
+            }
 
-      await User.findByIdAndDelete(user.id);
-      console.log("✅ User deleted successfully:", user.id);
-      return { success: true };
-    } catch (error) {
-      console.error("❌ Error syncing user deletion:", error);
-      throw error;
+            await User.findOneAndDelete({ clerkId: user.id });
+            console.log("✅ User deleted successfully:", user.id);
+            return { success: true };
+        } catch (error) {
+            console.error("❌ Error syncing user deletion:", error);
+            throw error;
+        }
     }
-  }
 );
 
 // Export all Inngest functions
