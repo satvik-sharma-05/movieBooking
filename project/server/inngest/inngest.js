@@ -12,7 +12,8 @@ export const syncUserCreation = inngest.createFunction(
   { event: "clerk/user.created" },
   async ({ event }) => {
     try {
-      console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
+// 🔍 Add this line to inspect the full payload
+    console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
 
       const user = event.data?.user;
       if (!user || !user.id) {
