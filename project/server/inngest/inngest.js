@@ -1,12 +1,14 @@
 import { Inngest } from "inngest";
 import User from "../models/user.model.js";
-import { Clerk } from "@clerk/backend";
 
-// Create Inngest client
+import { createClerkClient } from "@clerk/backend";
+
+
+
 export const inngest = new Inngest({ id: "my-app" });
 
 // Create Clerk client
-const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 /**
  * 🔄 Sync user creation from Clerk to your database
