@@ -1,9 +1,7 @@
 import { Inngest } from "inngest";
 import User from "../models/user.model.js"; // Assuming you have a User model defined
-import { Clerk } from "@clerk/clerk-sdk-node";
 // Create a client to send and receive events
 export const inngest = new Inngest({ id: "my-app" });
-const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
 
 /**
  * 🔄 Sync user creation from Clerk to your database
