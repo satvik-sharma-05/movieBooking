@@ -35,23 +35,7 @@ app.get('/', (_, res) => {
 app.get('/favicon.ico', (_, res) => res.status(204).end());
 
 
-app.post('/api/inngest', express.raw({ type: 'application/json' }), async (req, res) => {
-  const signature = req.headers['inngest-signature'];
-  const signingKey = process.env.INNGEST_SIGNING_KEY;
 
-  const isValid = verifySignature({
-    payload: req.body,
-    signature,
-    signingKey,
-  });
-
-  if (!isValid) {
-    return res.status(401).send('Signature verification failed');
-  }
-
-  // Proceed with webhook logic
-  res.status(200).send('Webhook received');
-});
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
