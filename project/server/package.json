@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@clerk/backend": "^2.7.0",
     "@clerk/express": "^1.7.17",
     "axios": "^1.11.0",
     "cloudinary": "^2.7.0",
