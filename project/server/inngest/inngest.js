@@ -1,6 +1,6 @@
 import { Inngest } from "inngest";
 import User from "../models/user.model.js"; // Assuming you have a User model defined
-import { Clerk } from "@clerk/clerk-sdk-node";
+import { Clerk } from "@clerk/backend";
 // Create a client to send and receive events
 export const inngest = new Inngest({ id: "my-app" });
 const clerk = Clerk({ secretKey: process.env.CLERK_SECRET_KEY });
@@ -12,25 +12,29 @@ export const syncUserCreation = inngest.createFunction(
   { id: "sync-user-creation", name: "Sync User Creation" },
   { event: "clerk/user.created" },
   async ({ event }) => {
-    try {
-// 🔍 Add this line to inspect the full payload
     console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
 
-      const user = event.data?.user;
-      if (!user || !user.id) {
-        console.warn("⚠️ Missing user data in clerk/user.created event:", event);
-        return { success: false, error: "Missing user data" };
-      }
+    const minimalUser = event.data;
+    if (!minimalUser || !minimalUser.id) {
+      console.warn("⚠️ Missing user ID in event");
+      return { success: false, error: "Missing user ID" };
+    }
 
-      const { id, firstName, lastName, emailAddresses, imageUrl } = user;
+    try {
+      // ✅ Fetch full user from Clerk
+      const fullUser = await clerk.users.getUser(minimalUser.id);
+
+      const email = fullUser.emailAddresses?.[0]?.emailAddress || "";
+      const image = fullUser.imageUrl || minimalUser.image_url || "";
+
       const userData = {
-        clerkId: id,
-        name: `${firstName} ${lastName}`,
-        email: emailAddresses?.[0]?.emailAddress || "",
-        image: imageUrl || "",
+        clerkId: fullUser.id,
+        name: `${fullUser.firstName} ${fullUser.lastName}`,
+        email,
+        image
       };
 
-      await User.create(userData); // ✅ Only one call here
+      await User.create(userData);
       console.log("✅ User created successfully:", userData);
       return { success: true };
     } catch (error) {
@@ -39,6 +43,7 @@ export const syncUserCreation = inngest.createFunction(
     }
   }
 );
+
 
 /**
  * 🔄 Sync user updates from Clerk to your database
