@@ -19,8 +19,11 @@ app.use(cors());
 app.use(clerkMiddleware());
 app.use('api/clerk', clerkMiddleware());
 // Set up the "/api/inngest" (recommended) routes with the serve handler
-app.use("/api/inngest", serve({ client: inngest, functions }));
-
+app.use("/api/inngest", serve({
+  client: inngest,
+  functions,
+  signingKey: process.env.INNGEST_SIGNING_KEY
+}));
 // Middleware
 app.use(express.json());
 app.use(cors());
