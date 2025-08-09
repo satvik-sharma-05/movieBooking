@@ -10,6 +10,10 @@ const PORT = process.env.PORT || 3000;
 
 await connectDB();
 
+// Middleware
+app.use(express.json());
+app.use(cors());
+
 // Initialize Clerk middleware
 
 app.use(clerkMiddleware());
