@@ -26,6 +26,10 @@ await connectDB();
 app.use(clerkMiddleware());
 app.use("/api/clerk", clerkMiddleware());
 
+// ✅ Inngest middleware
+
+app.use("/api/inngest", serve({ client: inngest, functions }));
+
 // 🔔 Inngest webhook handler
 app.post("/api/inngest", async (req, res) => {
   const rawBody = req.body;
