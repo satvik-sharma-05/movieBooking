@@ -23,23 +23,48 @@ app.post("/api/inngest", async (req, res) => {
 
   console.log("📦 Full incoming body:", rawBody);
 
-  // Manually construct the event
+  // Clerk sends events with `type` and `data`
+  if (!rawBody?.type || !rawBody?.data) {
+    console.warn("⚠️ Invalid Clerk webhook payload:", rawBody);
+    return res.status(400).json({ error: "Invalid Clerk webhook payload" });
+  }
+
   const event = {
-    name: "clerk/user.created", // or dynamically infer from headers or payload
+    name: rawBody.type, // e.g. "clerk/user.created"
     data: rawBody.data,
   };
 
-  if (!event?.data) {
-    return res.status(400).json({ error: "Missing event data", body: rawBody });
-  }
-
   try {
     await inngest.send([event]);
-    console.log("✅ Event sent to Inngest");
+    console.log("✅ Event sent to Inngest:", event.name);
     res.status(200).json({ success: true });
   } catch (err) {
-    console.error("❌ Failed to send event", err);
+    console.error("❌ Failed to send event to Inngest", err);
     res.status(500).json({ error: "Failed to send event" });
+  }
+});
+
+app.post("/test/clerk-webhook", async (req, res) => {
+  const mockEvent = {
+    type: "clerk/user.created",
+    data: {
+      id: "user_123",
+      object: "user",
+      email_addresses: [{ email_address: "test@example.com" }],
+      image_url: "https://example.com/image.png",
+    },
+  };
+
+  try {
+    await fetch("https://movie-booking-server-psi.vercel.app/api/inngest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(mockEvent),
+    });
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
