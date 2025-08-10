@@ -73,10 +73,7 @@ export const syncUserCreation = inngest.createFunction(
         const image =
             fullUser.imageUrl || minimalUser.image_url || "https://default.image/url.png";
 
-        if (!userData.clerkId || !userData.image || !userData.name) {
-            console.warn("⚠️ Incomplete user data:", userData);
-            return { success: false, error: "Missing required fields" };
-        }
+       
         // Construct user payload
         const userData = {
             clerkId: fullUser.id,
@@ -85,6 +82,11 @@ export const syncUserCreation = inngest.createFunction(
             image,
             createdAt: new Date(fullUser.createdAt),
         };
+// ✅ Now validate
+if (!userData.clerkId || !userData.image || !userData.name) {
+  console.warn("⚠️ Incomplete user data:", userData);
+  return { success: false, error: "Missing required fields" };
+}
 
         console.log("📦 Final userData to insert:", userData);
 
