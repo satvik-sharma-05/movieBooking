@@ -7,22 +7,26 @@ import { inngest, functions } from "./inngest/inngest.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.use(express.json());
+app.use(cors());
 
 await connectDB();
 
-app.use(express.json());
-app.use(cors());
+
+// Middleware for Clerk authentication
 app.use(clerkMiddleware());
 app.use("/api/clerk", clerkMiddleware());
 
 // Custom Inngest webhook handler
 app.post("/api/inngest", async (req, res) => {
-  const { event } = req.body;
+  const rawBody = req.body;
+  const event = rawBody?.event || rawBody;
 
-  console.log("📨 Raw incoming event:", event);
+  console.log("📦 Full incoming body:", rawBody);
+  console.log("📨 Parsed event:", event);
 
   if (!event?.name || !event?.data) {
-    return res.status(400).json({ error: "Invalid event structure" });
+    return res.status(400).json({ error: "Invalid event structure", body: rawBody });
   }
 
   try {
