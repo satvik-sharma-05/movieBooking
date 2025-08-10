@@ -27,19 +27,17 @@ await connectDB();
 // 🧪 Local test route to simulate Clerk webhook
 app.post("/test-sync", async (req, res) => {
   console.log("🧪 /test-sync route hit - START");
-  console.log("Request received:", req.method, req.url);
   try {
-    console.log("Sending event to:", inngest.options.baseUrl);
     await inngest.send({
       name: "user.created",
       data: {
-        id: "user_test123",
+        id: "user_test789",
         object: "user",
-        first_name: "Test",
-        last_name: "User",
-        email_addresses: [{ id: "idn_test123", email_address: "test@example.com" }],
-        primary_email_address_id: "idn_test123",
-        image_url: "https://img.clerk.com/test.png",
+        first_name: "John",
+        last_name: "Smith",
+        email_addresses: [{ id: "idn_test789", email_address: "john.smith@example.com" }],
+        primary_email_address_id: "idn_test789",
+        image_url: "https://img.clerk.com/john.png",
         created_at: Date.now(),
       },
     });
