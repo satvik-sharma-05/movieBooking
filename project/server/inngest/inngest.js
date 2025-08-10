@@ -1,12 +1,12 @@
-import { Inngest } from "inngest";
 import User from "../models/user.model.js";
-
 import { createClerkClient } from "@clerk/backend";
+import inngestPkg from "inngest";
 
 
-
+// Create Inngest client
+const { Inngest } = inngestPkg;
+console.log("🚀 Inngest client initialized wit  :", Object.keys(inngestPkg));
 export const inngest = new Inngest({ id: "my-app" });
-
 // Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
@@ -18,7 +18,11 @@ export const syncUserCreation = inngest.createFunction(
   { event: "clerk/user.created" },
   async ({ event }) => {
     console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
-
+    console.log("📦 Event data:", event.data)
+    console.log("📦 Event name:", event.name);
+    if(!event?.data?.id){
+        throw new Error("Missing user ID in event data");
+    }
     const minimalUser = event.data;
     if (!minimalUser || !minimalUser.id) {
       console.warn("⚠️ Missing user ID in event");
@@ -116,6 +120,3 @@ export const syncUserDeletion = inngest.createFunction(
 // Export all Inngest functions
 export const functions = [syncUserCreation, syncUserUpdate, syncUserDeletion];
 
-// Register all functions with Inngest
-
-inngest.register(...functions); 
