@@ -18,7 +18,7 @@ export const syncUserCreation = inngest.createFunction(
   { event: "clerk/user.created" },
   async ({ event }) => {
     console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
-    console.log("📦 Event data:", event.data)
+    console.log("📨 Event data received:", event.data);
     console.log("📦 Event name:", event.name);
     if(!event?.data?.id){
         throw new Error("Missing user ID in event data");
@@ -51,6 +51,32 @@ export const syncUserCreation = inngest.createFunction(
     }
   }
 );
+
+
+
+export const handleUserCreated = inngest.createFunction(
+  { id: "sync-user" },
+  { event: "clerk/user.created" },
+  async ({ event, step }) => {
+    console.log("🎯 Function triggered:", event);
+
+    await connectDB();
+
+    await step.run("Insert user into MongoDB", async () => {
+      const userData = {
+        clerkId: event.data.id,
+        email: event.data.email_addresses?.[0]?.email_address,
+        createdAt: new Date(event.data.created_at),
+      };
+
+      console.log("📦 Inserting user:", userData);
+      await User.create(userData);
+    });
+  }
+);
+
+
+
 
 /**
  * 🔄 Sync user updates from Clerk to your database
