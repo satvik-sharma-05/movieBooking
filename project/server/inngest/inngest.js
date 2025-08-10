@@ -18,7 +18,8 @@ export const syncUserCreation = inngest.createFunction(
     { event: "clerk/user.created" },
     async ({ event, step }) => {
         console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
-
+        console.log("🧪 Debug: event.name =", event.name);
+        console.log("🧪 Debug: event.data =", JSON.stringify(event.data, null, 2));
         // ✅ Type guard to validate payload
         if (event.name !== "clerk/user.created" || event.data?.object !== "user") {
             console.warn("⚠️ Received non-user event:", event.name, event.data?.object);

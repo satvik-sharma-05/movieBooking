@@ -45,28 +45,31 @@ app.post("/api/inngest", async (req, res) => {
 });
 
 app.post("/test/clerk-webhook", async (req, res) => {
-const mockEvent = {
-  name: "clerk/user.created", // ✅ Must be 'name', not 'type'
-  data: {
-    id: "user_test_123",
-    object: "user",
-    email_addresses: [{ email_address: "test@example.com" }],
-    image_url: "https://example.com/image.png",
-    first_name: "Test",
-    last_name: "User",
-    created_at: Date.now(),
-  },
-};;
+  const mockEvent = {
+    name: "clerk/user.created",
+    data: {
+      id: "user_test_123",
+      object: "user",
+      email_addresses: [{ email_address: "test@example.com" }],
+      image_url: "https://example.com/image.png",
+      first_name: "Test",
+      last_name: "User",
+      created_at: Date.now(),
+    },
+  };
 
   try {
-    await fetch("https://movie-booking-server-psi.vercel.app/api/inngest", {
+    const response = await fetch("https://movie-booking-server-psi.vercel.app/api/inngest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(mockEvent),
     });
 
-    res.status(200).json({ success: true });
+    const result = await response.json();
+    console.log("📤 Inngest response:", result);
+    res.status(200).json({ success: true, result });
   } catch (err) {
+    console.error("❌ Failed to send event to Inngest:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
