@@ -68,7 +68,7 @@ const mockEvent = {
     created_at: Date.now(),
   },
 };
-
+console.log("📦 Sending mock event:", JSON.stringify(mockEvent, null, 2));
   try {
     const response = await fetch("https://movie-booking-server-psi.vercel.app/api/inngest", {
       method: "POST",
