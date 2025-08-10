@@ -14,96 +14,100 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
  * 🔄 Sync user creation from Clerk to your database
  */
 export const syncUserCreation = inngest.createFunction(
-    { id: "sync-user-creation", name: "Sync User Creation" },
-    { event: "clerk/user.created" },
-    async ({ event, step }) => {
-        console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
-        console.log("🧪 Debug: event.name =", event.name);
-        console.log("🧪 Debug: event.data =", JSON.stringify(event.data, null, 2));
-        // ✅ Type guard to validate payload
-        if (event.name !== "clerk/user.created" || event.data?.object !== "user") {
-            console.warn("⚠️ Received non-user event:", event.name, event.data?.object);
-            return { success: false, error: "Invalid event type or object" };
-        }
+  { id: "sync-user-creation", name: "Sync User Creation" },
+  { event: "clerk/user.created" },
+  async ({ event, step }) => {
+    console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
+    console.log("🧪 Debug: event.name =", event.name);
+    console.log("🧪 Debug: event.data =", JSON.stringify(event.data, null, 2));
 
-        const minimalUser = event.data;
-        if (!minimalUser?.id) {
-            console.warn("⚠️ Missing user ID in event");
-            return { success: false, error: "Missing user ID" };
-        }
-
-        // Step: Fetch full user from Clerk
-        const fullUser = await step.run("fetch-full-user", async () => {
-            console.log("🔍 Fetching full user from Clerk:", minimalUser.id);
-            try {
-                const user = await clerk.users.getUser(minimalUser.id);
-                console.log("✅ Clerk user fetched:", user.emailAddresses?.[0]?.emailAddress);
-                return user;
-            } catch (err) {
-                console.error("❌ Clerk fetch failed:", err.message);
-                throw new Error("Clerk fetch failed");
-            }
-        });
-
-        if (!fullUser || !fullUser.id) {
-            console.error("❌ Clerk user fetch failed or returned empty");
-            return { success: false, error: "Clerk user fetch failed" };
-        }
-        else console.log("✅ Full user fetched from Clerk:", JSON.stringify(fullUser, null, 2));
-
-        // Extract primary email address safely
-        const email =
-            fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
-            minimalUser.email_addresses?.[0]?.email_address ||
-            "unknown@example.com";
-
-        if (email === "unknown@example.com") {
-            console.warn("⚠️ No valid email found for user:", fullUser.id);
-        }
-
-        // Fallback to image
-        const image =
-            fullUser.imageUrl || minimalUser.image_url || "https://default.image/url.png";
-
-        // Construct user payload
-        const userData = {
-            clerkId: fullUser.id,
-            name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
-            email,
-            image,
-            createdAt: new Date(fullUser.createdAt),
-        };
-
-        console.log("📦 Final userData to insert:", userData);
-
-        // Validate required fields
-        if (!userData.clerkId || !userData.email || !userData.image || !userData.name) {
-            console.warn("⚠️ Incomplete user data:", userData);
-            return { success: false, error: "Missing required fields" };
-        }
-        console.log("📥 Event received:", JSON.stringify(event, null, 2));
-        await connectDB();
-        console.log("🧠 DB connected inside Inngest function");
-        try {
-            const result = await User.findOneAndUpdate(
-                { clerkId: fullUser.id },
-                { $setOnInsert: userData },
-                { upsert: true, new: true }
-            );
-
-            console.log("✅ User synced to MongoDB:", result);
-            return { success: true, userId: fullUser.id };
-        } catch (error) {
-            console.error("❌ MongoDB insert/update failed:", error.message);
-            if (error.code === 11000) {
-                console.error("⚠️ Duplicate key error:", error.keyValue);
-            }
-            return { success: false, error: error.message };
-        }
+    // ✅ Type guard to validate payload
+    if (!event?.name?.startsWith("clerk/user.") || event.data?.object !== "user") {
+      console.warn("⚠️ Invalid event structure:", {
+        name: event?.name,
+        object: event?.data?.object,
+      });
+      return { success: false, error: "Invalid Clerk webhook payload" };
     }
+
+    const minimalUser = event.data;
+    if (!minimalUser?.id) {
+      console.warn("⚠️ Missing user ID in event");
+      return { success: false, error: "Missing user ID" };
+    }
+
+    // Step: Fetch full user from Clerk
+    const fullUser = await step.run("fetch-full-user", async () => {
+      console.log("🔍 Fetching full user from Clerk:", minimalUser.id);
+      try {
+        const user = await clerk.users.getUser(minimalUser.id);
+        console.log("✅ Clerk user fetched:", user.emailAddresses?.[0]?.emailAddress);
+        return user;
+      } catch (err) {
+        console.error("❌ Clerk fetch failed:", err.message);
+        throw new Error("Clerk fetch failed");
+      }
+    });
+
+    if (!fullUser || !fullUser.id) {
+      console.error("❌ Clerk user fetch failed or returned empty");
+      return { success: false, error: "Clerk user fetch failed" };
+    }
+
+    console.log("✅ Full user fetched from Clerk:", JSON.stringify(fullUser, null, 2));
+
+    // Extract primary email address safely
+    const email =
+      fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
+      minimalUser.email_addresses?.[0]?.email_address ||
+      "unknown@example.com";
+
+    if (email === "unknown@example.com") {
+      console.warn("⚠️ No valid email found for user:", fullUser.id);
+    }
+
+    // Fallback to image
+    const image =
+      fullUser.imageUrl || minimalUser.image_url || "https://default.image/url.png";
+
+    // Construct user payload
+    const userData = {
+      clerkId: fullUser.id,
+      name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
+      email,
+      image,
+      createdAt: new Date(fullUser.createdAt),
+    };
+
+    console.log("📦 Final userData to insert:", userData);
+
+    // Validate required fields
+    if (!userData.clerkId || !userData.email || !userData.image || !userData.name) {
+      console.warn("⚠️ Incomplete user data:", userData);
+      return { success: false, error: "Missing required fields" };
+    }
+
+    await connectDB();
+    console.log("🧠 DB connected inside Inngest function");
+
+    try {
+      const result = await User.findOneAndUpdate(
+        { clerkId: fullUser.id },
+        { $setOnInsert: userData },
+        { upsert: true, new: true }
+      );
+
+      console.log("✅ User synced to MongoDB:", result);
+      return { success: true, userId: fullUser.id };
+    } catch (error) {
+      console.error("❌ MongoDB insert/update failed:", error.message);
+      if (error.code === 11000) {
+        console.error("⚠️ Duplicate key error:", error.keyValue);
+      }
+      return { success: false, error: error.message };
+    }
+  }
 );
-
-
 
 
 
