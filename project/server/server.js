@@ -52,9 +52,14 @@ app.post("/test-sync", async (req, res) => {
   console.log("🧪 /test-sync route hit - END");
 });
 
+
+app.use("/api/inngest", (req, res, next) => {
+  console.log("Inngest request received:", req.method, req.url, req.headers);
+  next();
+}, serve({ client: inngest, functions }));
+
 app.use(clerkMiddleware({ ignoredRoutes: ["/api/inngest"] }));
 app.use("/api/clerk", clerkMiddleware());
-app.use("/api/inngest", serve({ client: inngest, functions }));
 
 // 🔔 Inngest webhook handler
 app.post("/api/inngest", async (req, res) => {

@@ -11,7 +11,7 @@ const inngest = new Inngest({
   name: "movie-booking-server",
   eventKey: process.env.INNGEST_EVENT_KEY,
   signingKey: process.env.INNGEST_SIGNING_KEY,
-  baseUrl: process.env.NODE_ENV === "production" ? "https://movie-booking-server-psi.vercel.app/api/inngest" : "http://localhost:8288",
+  baseUrl: process.env.NODE_ENV === "production" ? "https://inn.gs" : "http://localhost:8288",
 });
 // Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
