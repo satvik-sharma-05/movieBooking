@@ -11,6 +11,7 @@ export const inngest = new Inngest({
     name: "movie-booking-server",
     eventKey: process.env.INNGEST_EVENT_KEY,
     signingKey: process.env.INNGEST_SIGNING_KEY,
+    baseUrl:"http://localhost:3000/api/inngest",
 });
 // Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
@@ -22,12 +23,13 @@ export const syncUserCreation = inngest.createFunction(
     { id: "sync-user-creation", name: "Sync User Creation" },
     { event: "user.created" },
     async ({ event, step }) => {
-        console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
-        console.log("🧪 Debug: event.name =", event.name);
-        console.log("🧪 Debug: event.data =", JSON.stringify(event.data, null, 2));
+        console.log("📦 Incoming user.created event:", JSON.stringify(event, null, 2));
 
-        // ✅ Type guard to validate payload
-        if (!event?.name?.startsWith("clerk/user.") || event.data?.object !== "user") {
+        // ✅ Validate event structure
+        if (
+            !["user.created", "clerk/user.created", "clerk/user.updated"].includes(event.name) ||
+            event.data?.object !== "user"
+        ) {
             console.warn("⚠️ Invalid event structure:", {
                 name: event?.name,
                 object: event?.data?.object,
@@ -41,45 +43,31 @@ export const syncUserCreation = inngest.createFunction(
             return { success: false, error: "Missing user ID" };
         }
 
-        // Step: Fetch full user from Clerk
-        const fullUser = await step.run("fetch-full-user", async () => {
-            console.log("🔍 Fetching full user from Clerk:", minimalUser.id);
-            try {
-                const user = await clerk.users.getUser(minimalUser.id);
-                console.log("✅ Clerk user fetched:", user.emailAddresses?.[0]?.emailAddress);
-                return user;
-            } catch (err) {
-                console.error("❌ Clerk fetch failed:", err.message);
-                throw new Error("Clerk fetch failed");
-            }
-        });
+        // 🧠 Step: Fetch full user from Clerk
+        const fullUser = {
+            id: minimalUser.id,
+            firstName: minimalUser.first_name,
+            lastName: minimalUser.last_name,
+            emailAddresses: minimalUser.email_addresses,
+            primaryEmailAddressId: minimalUser.primary_email_address_id,
+            imageUrl: minimalUser.image_url,
+            createdAt: minimalUser.created_at
+        };
 
         if (!fullUser || !fullUser.id) {
             console.error("❌ Clerk user fetch failed or returned empty");
             return { success: false, error: "Clerk user fetch failed" };
         }
 
-        console.log("✅ Full user fetched from Clerk:", JSON.stringify(fullUser, null, 2));
-
-        // Extract primary email address safely
+        // 📭 Extract primary email address
         const email =
             fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
-            minimalUser.email_addresses?.[0]?.email_address ||
-            "test@example.com"; // ✅ fallback for dev
+            "unknown@example.com";
 
+        // 🖼️ Extract image
+        const image = fullUser.imageUrl || "https://default.image/url.png";
 
-        console.log("📭 Email addresses from Clerk:", fullUser.emailAddresses);
-
-        if (email === "unknown@example.com") {
-            console.warn("⚠️ No valid email found for user:", fullUser.id);
-        }
-
-        // Fallback to image
-        const image =
-            fullUser.imageUrl || minimalUser.image_url || "https://default.image/url.png";
-
-
-        // Construct user payload
+        // 🧱 Construct user payload
         const userData = {
             clerkId: fullUser.id,
             name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
@@ -87,40 +75,20 @@ export const syncUserCreation = inngest.createFunction(
             image,
             createdAt: new Date(fullUser.createdAt),
         };
-        // ✅ Now validate
-        if (!userData.clerkId || !userData.image || !userData.name) {
+
+        // ✅ Validate required fields
+        if (!userData.clerkId || !userData.name || !userData.email || !userData.image) {
             console.warn("⚠️ Incomplete user data:", userData);
             return { success: false, error: "Missing required fields" };
         }
 
-        console.log("📦 Final userData to insert:", userData);
+        console.log("📦 Final userData:", JSON.stringify(userData, null, 2));
 
-        // Validate required fields
-        if (!userData.clerkId || !userData.email || !userData.image || !userData.name) {
-            console.warn("⚠️ Incomplete user data:", userData);
-            return { success: false, error: "Missing required fields" };
-        }
-
+        // 🧠 Connect to DB (if needed)
         await connectDB();
         console.log("🧠 DB connected inside Inngest function");
 
-
-
-
-
-        const inserted = await User.create(userData);
-        console.log("✅ Forced insert:", inserted);
-        try {
-            const inserted = await User.create(userData);
-            console.log("✅ Inserted:", inserted);
-        } catch (err) {
-            console.error("❌ Insert failed:", err.message);
-        }
-        console.log("📦 Final userData to insert:", JSON.stringify(userData, null, 2));
-
-
-        console.log("📦 Attempting to insert user:", userData);
-
+        // 📥 Upsert user into MongoDB
         try {
             const result = await User.findOneAndUpdate(
                 { clerkId: userData.clerkId },
