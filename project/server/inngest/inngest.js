@@ -31,13 +31,14 @@ export const syncUserCreation = inngest.createFunction(
     });
 
     // Extract primary email address safely
-   const email =
-  fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
-  minimalUser.email_addresses?.[0]?.email_address ||
-  "unknown@example.com";
+    const email =
+      fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
+      minimalUser.email_addresses?.[0]?.email_address ||
+      "unknown@example.com";
 
-    // Fallback to minimal image if needed
-    const image = fullUser.imageUrl || minimalUser.image_url || "";
+    // Fallback to image
+    const image =
+      fullUser.imageUrl || minimalUser.image_url || "https://default.image/url.png";
 
     // Construct user payload
     const userData = {
@@ -49,23 +50,32 @@ export const syncUserCreation = inngest.createFunction(
     };
 
     // Validate required fields
-    if (!userData.clerkId || !userData.email) {
+    if (!userData.clerkId || !userData.email || !userData.image || !userData.name) {
       console.warn("⚠️ Incomplete user data:", userData);
       return { success: false, error: "Missing required fields" };
     }
 
-    // Insert into MongoDB
     await connectDB();
+
     try {
-      await User.create(userData);
-      console.log("✅ User created successfully:", userData);
+      const result = await User.findOneAndUpdate(
+        { clerkId: fullUser.id },
+        userData,
+        { upsert: true, new: true }
+      );
+
+      console.log("✅ User synced to MongoDB:", result);
       return { success: true, userId: fullUser.id };
     } catch (error) {
-      console.error("❌ Error inserting user into MongoDB:", error);
+      console.error("❌ MongoDB insert/update failed:", error.message);
+      if (error.code === 11000) {
+        console.error("⚠️ Duplicate key error:", error.keyValue);
+      }
       return { success: false, error: error.message };
     }
   }
 );
+
 
 
 
