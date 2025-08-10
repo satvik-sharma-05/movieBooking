@@ -45,18 +45,29 @@ app.post("/api/inngest", async (req, res) => {
 });
 
 app.post("/test/clerk-webhook", async (req, res) => {
-  const mockEvent = {
-    name: "clerk/user.created",
-    data: {
-      id: "user_test_123",
-      object: "user",
-      email_addresses: [{ email_address: "test@example.com" }],
-      image_url: "https://example.com/image.png",
-      first_name: "Test",
-      last_name: "User",
-      created_at: Date.now(),
-    },
-  };
+const mockEvent = {
+  name: "clerk/user.created",
+  data: {
+    id: "user_test_123",
+    object: "user",
+    email_addresses: [
+      {
+        id: "idn_test_email",
+        email_address: "test@example.com",
+        object: "email_address",
+        verification: {
+          status: "verified",
+          strategy: "admin",
+          object: "verification_admin",
+        },
+      },
+    ],
+    image_url: "https://example.com/image.png",
+    first_name: "Test",
+    last_name: "User",
+    created_at: Date.now(),
+  },
+};
 
   try {
     const response = await fetch("https://movie-booking-server-psi.vercel.app/api/inngest", {
