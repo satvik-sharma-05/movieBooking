@@ -32,6 +32,8 @@ export const syncUserCreation = inngest.createFunction(
 
     // Step: Fetch full user from Clerk
     const fullUser = await step.run("fetch-full-user", async () => {
+        console.log("✅ Full user fetched from Clerk:", JSON.stringify(fullUser, null, 2));
+
       return await clerk.users.getUser(minimalUser.id);
     });
 
