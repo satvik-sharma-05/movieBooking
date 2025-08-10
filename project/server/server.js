@@ -52,12 +52,8 @@ app.post("/test-sync", async (req, res) => {
   console.log("🧪 /test-sync route hit - END");
 });
 
-// ✅ Clerk middleware
-app.use(clerkMiddleware());
+app.use(clerkMiddleware({ ignoredRoutes: ["/api/inngest"] }));
 app.use("/api/clerk", clerkMiddleware());
-
-// ✅ Inngest middleware
-
 app.use("/api/inngest", serve({ client: inngest, functions }));
 
 // 🔔 Inngest webhook handler
