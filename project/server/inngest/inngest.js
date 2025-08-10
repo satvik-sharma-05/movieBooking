@@ -88,24 +88,28 @@ export const syncUserCreation = inngest.createFunction(
     }
 
     await connectDB();
-    console.log("🧠 DB connected inside Inngest function");
+console.log("🧠 DB connected inside Inngest function");
 
-    try {
-      const result = await User.findOneAndUpdate(
-        { clerkId: fullUser.id },
-        { $setOnInsert: userData },
-        { upsert: true, new: true }
-      );
+console.log("📦 Attempting to insert user:", userData);
 
-      console.log("✅ User synced to MongoDB:", result);
-      return { success: true, userId: fullUser.id };
-    } catch (error) {
-      console.error("❌ MongoDB insert/update failed:", error.message);
-      if (error.code === 11000) {
-        console.error("⚠️ Duplicate key error:", error.keyValue);
-      }
-      return { success: false, error: error.message };
-    }
+try {
+  const result = await User.findOneAndUpdate(
+    { clerkId: fullUser.id },
+    { $setOnInsert: userData },
+    { upsert: true, new: true }
+  );
+
+  if (!result) {
+    console.warn("⚠️ No document returned from MongoDB upsert");
+  } else {
+    console.log("✅ User synced to MongoDB:", result);
+  }
+
+  return { success: true, userId: fullUser.id };
+} catch (error) {
+  console.error("❌ MongoDB insert/update failed:", error);
+  return { success: false, error: error.message };
+}
   }
 );
 
