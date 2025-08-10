@@ -80,7 +80,7 @@ export const syncUserCreation = inngest.createFunction(
             console.warn("⚠️ Incomplete user data:", userData);
             return { success: false, error: "Missing required fields" };
         }
-
+        console.log("📥 Event received:", JSON.stringify(event, null, 2));
         await connectDB();
         console.log("🧠 DB connected inside Inngest function");
         try {

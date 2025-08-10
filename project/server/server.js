@@ -45,8 +45,8 @@ app.post("/api/inngest", async (req, res) => {
 });
 
 app.post("/test/clerk-webhook", async (req, res) => {
-  const mockEvent = {
-  type: "clerk/user.created",
+const mockEvent = {
+  name: "clerk/user.created", // ✅ Must be 'name', not 'type'
   data: {
     id: "user_test_123",
     object: "user",
@@ -56,7 +56,7 @@ app.post("/test/clerk-webhook", async (req, res) => {
     last_name: "User",
     created_at: Date.now(),
   },
-};
+};;
 
   try {
     await fetch("https://movie-booking-server-psi.vercel.app/api/inngest", {
