@@ -12,7 +12,7 @@ app.use(cors());
 
 await connectDB();
 
-
+PORT = process.env.PORT || 3000;
 // Middleware for Clerk authentication
 app.use(clerkMiddleware());
 app.use("/api/clerk", clerkMiddleware());
