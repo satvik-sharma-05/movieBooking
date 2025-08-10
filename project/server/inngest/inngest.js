@@ -152,7 +152,7 @@ export const syncUserCreation = inngest.createFunction(
  */
 export const syncUserUpdate = inngest.createFunction(
     { id: "sync-user-update", name: "Sync User Update" },
-    { event: "clerk/user.updated" },
+    { event: "user.updated" },
     async ({ event }) => {
         console.log("📦 Incoming clerk/user.updated event:", JSON.stringify(event, null, 2));
 
