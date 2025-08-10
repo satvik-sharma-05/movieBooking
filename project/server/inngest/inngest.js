@@ -20,7 +20,7 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
  */
 export const syncUserCreation = inngest.createFunction(
     { id: "sync-user-creation", name: "Sync User Creation" },
-    { event: "clerk/user.created" },
+    { event: "user.created" },
     async ({ event, step }) => {
         console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
         console.log("🧪 Debug: event.name =", event.name);
