@@ -7,11 +7,11 @@ import connectDB from "../config/db.js";
 const { Inngest } = inngestPkg;
 console.log("🚀 Inngest client initialized wit  :", Object.keys(inngestPkg));
 const inngest = new Inngest({
-  id: "my-app",
-  name: "movie-booking-server",
-  eventKey: process.env.INNGEST_EVENT_KEY,
-  signingKey: process.env.INNGEST_SIGNING_KEY,
-  baseUrl: process.env.NODE_ENV === "production" ? "https://inn.gs" : "http://localhost:8288",
+    id: "my-app",
+    name: "movie-booking-server",
+    eventKey: process.env.INNGEST_EVENT_KEY,
+    signingKey: process.env.INNGEST_SIGNING_KEY,
+    baseUrl: process.env.NODE_ENV === "production" ? "https://inn.gs" : "http://localhost:8288",
 });
 // Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
@@ -60,10 +60,12 @@ export const syncUserCreation = inngest.createFunction(
         }
 
         // 📭 Extract primary email address
-        const email =
-            fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
-            "unknown@example.com";
-
+        const email = fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress || fullUser.emailAddresses?.[0]?.emailAddress;
+        if (!email) {
+            console.warn("⚠️ No valid email found, skipping upsert");
+            return { success: false, error: "No valid email address" };
+        }
+        console.log("📧 Extracted email:", email);
         // 🖼️ Extract image
         const image = fullUser.imageUrl || "https://default.image/url.png";
 
