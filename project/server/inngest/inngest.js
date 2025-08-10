@@ -6,7 +6,12 @@ import connectDB from "../config/db.js";
 // Create Inngest client
 const { Inngest } = inngestPkg;
 console.log("🚀 Inngest client initialized wit  :", Object.keys(inngestPkg));
-export const inngest = new Inngest({ id: "my-app" });
+export const inngest = new Inngest({
+    id:"my-app",
+     name: "movie-booking-server",
+     eventKey: process.env.INNGEST_EVENT_KEY,
+     signingKey: process.env.INNGEST_SIGNING_KEY,
+});
 // Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
