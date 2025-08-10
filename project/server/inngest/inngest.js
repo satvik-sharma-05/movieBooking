@@ -7,10 +7,10 @@ import connectDB from "../config/db.js";
 const { Inngest } = inngestPkg;
 console.log("🚀 Inngest client initialized wit  :", Object.keys(inngestPkg));
 export const inngest = new Inngest({
-    id:"my-app",
-     name: "movie-booking-server",
-     eventKey: process.env.INNGEST_EVENT_KEY,
-     signingKey: process.env.INNGEST_SIGNING_KEY,
+    id: "my-app",
+    name: "movie-booking-server",
+    eventKey: process.env.INNGEST_EVENT_KEY,
+    signingKey: process.env.INNGEST_SIGNING_KEY,
 });
 // Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
@@ -78,7 +78,7 @@ export const syncUserCreation = inngest.createFunction(
         const image =
             fullUser.imageUrl || minimalUser.image_url || "https://default.image/url.png";
 
-       
+
         // Construct user payload
         const userData = {
             clerkId: fullUser.id,
@@ -87,11 +87,11 @@ export const syncUserCreation = inngest.createFunction(
             image,
             createdAt: new Date(fullUser.createdAt),
         };
-// ✅ Now validate
-if (!userData.clerkId || !userData.image || !userData.name) {
-  console.warn("⚠️ Incomplete user data:", userData);
-  return { success: false, error: "Missing required fields" };
-}
+        // ✅ Now validate
+        if (!userData.clerkId || !userData.image || !userData.name) {
+            console.warn("⚠️ Incomplete user data:", userData);
+            return { success: false, error: "Missing required fields" };
+        }
 
         console.log("📦 Final userData to insert:", userData);
 
@@ -104,12 +104,27 @@ if (!userData.clerkId || !userData.image || !userData.name) {
         await connectDB();
         console.log("🧠 DB connected inside Inngest function");
 
+
+
+
+
+        const inserted = await User.create(userData);
+        console.log("✅ Forced insert:", inserted);
+        try {
+            const inserted = await User.create(userData);
+            console.log("✅ Inserted:", inserted);
+        } catch (err) {
+            console.error("❌ Insert failed:", err.message);
+        }
+        console.log("📦 Final userData to insert:", JSON.stringify(userData, null, 2));
+
+
         console.log("📦 Attempting to insert user:", userData);
 
         try {
             const result = await User.findOneAndUpdate(
-                { clerkId: fullUser.id },
-                { $setOnInsert: userData },
+                { clerkId: userData.clerkId },
+                { $set: userData },
                 { upsert: true, new: true }
             );
 
