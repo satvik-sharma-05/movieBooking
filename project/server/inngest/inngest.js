@@ -18,6 +18,7 @@ export const syncUserCreation = inngest.createFunction(
   { event: "clerk/user.created" },
   async ({ event, step }) => {
     console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
+
     // ✅ Type guard to validate payload
     if (event.name !== "clerk/user.created" || event.data?.object !== "user") {
       console.warn("⚠️ Received non-user event:", event.name, event.data?.object);
@@ -32,16 +33,20 @@ export const syncUserCreation = inngest.createFunction(
 
     // Step: Fetch full user from Clerk
     const fullUser = await step.run("fetch-full-user", async () => {
-        console.log("✅ Full user fetched from Clerk:", JSON.stringify(fullUser, null, 2));
-
       return await clerk.users.getUser(minimalUser.id);
     });
+
+    console.log("✅ Full user fetched from Clerk:", JSON.stringify(fullUser, null, 2));
 
     // Extract primary email address safely
     const email =
       fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
       minimalUser.email_addresses?.[0]?.email_address ||
       "unknown@example.com";
+
+    if (email === "unknown@example.com") {
+      console.warn("⚠️ No valid email found for user:", fullUser.id);
+    }
 
     // Fallback to image
     const image =
@@ -56,6 +61,8 @@ export const syncUserCreation = inngest.createFunction(
       createdAt: new Date(fullUser.createdAt),
     };
 
+    console.log("📦 Final userData to insert:", userData);
+
     // Validate required fields
     if (!userData.clerkId || !userData.email || !userData.image || !userData.name) {
       console.warn("⚠️ Incomplete user data:", userData);
@@ -67,7 +74,7 @@ export const syncUserCreation = inngest.createFunction(
     try {
       const result = await User.findOneAndUpdate(
         { clerkId: fullUser.id },
-        userData,
+        { $setOnInsert: userData },
         { upsert: true, new: true }
       );
 
@@ -105,24 +112,48 @@ export const syncUserUpdate = inngest.createFunction(
       return { success: false, error: "Missing user ID" };
     }
 
+    await connectDB();
+
     try {
       const fullUser = await clerk.users.getUser(minimalUser.id);
-console.log("✅ Fetched full user from Clerk:", fullUser);
+      console.log("✅ Fetched full user from Clerk:", JSON.stringify(fullUser, null, 2));
+
+      const email =
+        fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
+        minimalUser.email_addresses?.[0]?.email_address ||
+        "unknown@example.com";
+
+      if (email === "unknown@example.com") {
+        console.warn("⚠️ No valid email found for user:", fullUser.id);
+      }
+
+      const image =
+        fullUser.imageUrl || minimalUser.image_url || "https://default.image/url.png";
 
       const updatedUserData = {
-        name: `${fullUser.firstName} ${fullUser.lastName}`,
-        email: fullUser.emailAddresses?.[0]?.emailAddress || "",
-        image: fullUser.imageUrl || minimalUser.image_url || "",
+        name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
+        email,
+        image,
       };
 
-      await User.findOneAndUpdate({ clerkId: fullUser.id }, updatedUserData, { new: true });
-      console.log("✅ User updated successfully:", updatedUserData);
+      console.log("📦 Final updatedUserData:", updatedUserData);
+
+      const result = await User.findOneAndUpdate(
+        { clerkId: fullUser.id },
+        { $set: updatedUserData },
+        { new: true }
+      );
+
+      if (!result) {
+        console.warn("⚠️ No matching user found in MongoDB for update:", fullUser.id);
+        return { success: false, error: "User not found in DB" };
+      }
+
+      console.log("✅ User updated successfully:", result);
       return { success: true };
     } catch (error) {
-      console.error("❌ Error syncing user update:", error);
-      console.error("❌ Clerk SDK error:", error);
-
-      throw error;
+      console.error("❌ Error syncing user update:", error.message);
+      return { success: false, error: error.message };
     }
   }
 );

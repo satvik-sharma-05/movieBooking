@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
+    index: true, // 🔍 speeds up queries by clerkId
   },
   name: {
     type: String,
@@ -16,15 +17,14 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
     trim: true,
+    match: [/^\S+@\S+\.\S+$/, 'Invalid email format'], // ✅ basic email validation
   },
   image: {
     type: String,
     required: true,
   },
-  createdAt: {
-  type: Date,
-  required: true,
-}
+}, {
+  timestamps: true, // 🕒 adds createdAt and updatedAt automatically
 });
 
 const User = mongoose.model("User", userSchema);
