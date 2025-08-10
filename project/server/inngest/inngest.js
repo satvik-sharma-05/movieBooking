@@ -33,15 +33,21 @@ export const syncUserCreation = inngest.createFunction(
 
         // Step: Fetch full user from Clerk
         const fullUser = await step.run("fetch-full-user", async () => {
-            console.log("🔍 Inside step.run: fetching user from Clerk");
+            console.log("🔍 Fetching full user from Clerk:", minimalUser.id);
+            try {
+                const user = await clerk.users.getUser(minimalUser.id);
+                console.log("✅ Clerk user fetched:", user.emailAddresses?.[0]?.emailAddress);
+                return user;
+            } catch (err) {
+                console.error("❌ Clerk fetch failed:", err.message);
+                throw new Error("Clerk fetch failed");
+            }
+        });
 
-            return await clerk.users.getUser(minimalUser.id);
-        }, { id: minimalUser.id });
-
-       if (!fullUser || !fullUser.id) {
-  console.error("❌ Clerk user fetch failed or returned empty");
-  return { success: false, error: "Clerk user fetch failed" };
-}
+        if (!fullUser || !fullUser.id) {
+            console.error("❌ Clerk user fetch failed or returned empty");
+            return { success: false, error: "Clerk user fetch failed" };
+        }
         else console.log("✅ Full user fetched from Clerk:", JSON.stringify(fullUser, null, 2));
 
         // Extract primary email address safely
@@ -76,7 +82,7 @@ export const syncUserCreation = inngest.createFunction(
         }
 
         await connectDB();
-
+        console.log("🧠 DB connected inside Inngest function");
         try {
             const result = await User.findOneAndUpdate(
                 { clerkId: fullUser.id },
