@@ -26,8 +26,10 @@ await connectDB();
 
 // 🧪 Local test route to simulate Clerk webhook
 app.post("/test-sync", async (req, res) => {
-    console.log("🧪 /test-sync route hit")
+  console.log("🧪 /test-sync route hit - START");
+  console.log("Request received:", req.method, req.url);
   try {
+    console.log("Sending event to:", inngest.options.baseUrl);
     await inngest.send({
       name: "user.created",
       data: {
@@ -35,23 +37,19 @@ app.post("/test-sync", async (req, res) => {
         object: "user",
         first_name: "Test",
         last_name: "User",
-        email_addresses: [
-          {
-            id: "idn_test123",
-            email_address: "test@example.com"
-          }
-        ],
+        email_addresses: [{ id: "idn_test123", email_address: "test@example.com" }],
         primary_email_address_id: "idn_test123",
         image_url: "https://img.clerk.com/test.png",
-        created_at: Date.now()
-      }
+        created_at: Date.now(),
+      },
     });
-
+    console.log("✅ Send result: Event sent");
     res.send({ success: true, message: "Event sent to Inngest" });
   } catch (err) {
-    console.error("❌ Failed to send event:", err.message);
+    console.error("❌ Failed to send event:", err.message, err.stack);
     res.status(500).send({ success: false, error: err.message });
   }
+  console.log("🧪 /test-sync route hit - END");
 });
 
 // ✅ Clerk middleware

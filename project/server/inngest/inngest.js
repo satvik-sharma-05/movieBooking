@@ -6,12 +6,12 @@ import connectDB from "../config/db.js";
 // Create Inngest client
 const { Inngest } = inngestPkg;
 console.log("🚀 Inngest client initialized wit  :", Object.keys(inngestPkg));
-export const inngest = new Inngest({
-    id: "my-app",
-    name: "movie-booking-server",
-    eventKey: process.env.INNGEST_EVENT_KEY,
-    signingKey: process.env.INNGEST_SIGNING_KEY,
-    baseUrl:"http://localhost:3000/api/inngest",
+const inngest = new Inngest({
+  id: "my-app",
+  name: "movie-booking-server",
+  eventKey: process.env.INNGEST_EVENT_KEY,
+  signingKey: process.env.INNGEST_SIGNING_KEY,
+  baseUrl: process.env.NODE_ENV === "production" ? "https://movie-booking-server-psi.vercel.app/api/inngest" : "http://localhost:8288",
 });
 // Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
@@ -207,3 +207,4 @@ export const syncUserDeletion = inngest.createFunction(
 // Export all Inngest functions
 export const functions = [syncUserCreation, syncUserUpdate, syncUserDeletion];
 
+export { inngest };
