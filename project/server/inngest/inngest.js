@@ -33,13 +33,15 @@ export const syncUserCreation = inngest.createFunction(
 
         // Step: Fetch full user from Clerk
         const fullUser = await step.run("fetch-full-user", async () => {
+            console.log("🔍 Inside step.run: fetching user from Clerk");
+
             return await clerk.users.getUser(minimalUser.id);
         }, { id: minimalUser.id });
 
-        if (!fullUser || !fullUser.id) {
-            console.error("❌ Failed to fetch full user from Clerk");
-            return { success: false, error: "Clerk user fetch failed" };
-        }
+       if (!fullUser || !fullUser.id) {
+  console.error("❌ Clerk user fetch failed or returned empty");
+  return { success: false, error: "Clerk user fetch failed" };
+}
         else console.log("✅ Full user fetched from Clerk:", JSON.stringify(fullUser, null, 2));
 
         // Extract primary email address safely
