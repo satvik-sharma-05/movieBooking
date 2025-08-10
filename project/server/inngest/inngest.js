@@ -31,8 +31,10 @@ export const syncUserCreation = inngest.createFunction(
     });
 
     // Extract primary email address safely
-    const email =
-      fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress || "";
+   const email =
+  fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
+  minimalUser.email_addresses?.[0]?.email_address ||
+  "unknown@example.com";
 
     // Fallback to minimal image if needed
     const image = fullUser.imageUrl || minimalUser.image_url || "";
@@ -53,6 +55,7 @@ export const syncUserCreation = inngest.createFunction(
     }
 
     // Insert into MongoDB
+    await connectDB();
     try {
       await User.create(userData);
       console.log("✅ User created successfully:", userData);
@@ -65,26 +68,7 @@ export const syncUserCreation = inngest.createFunction(
 );
 
 
-export const handleUserCreated = inngest.createFunction(
-  { id: "sync-user" },
-  { event: "clerk/user.created" },
-  async ({ event, step }) => {
-    console.log("🎯 Function triggered:", event);
 
-    await connectDB();
-
-    await step.run("Insert user into MongoDB", async () => {
-      const userData = {
-        clerkId: event.data.id,
-        email: event.data.email_addresses?.[0]?.email_address,
-        createdAt: new Date(event.data.created_at),
-      };
-
-      console.log("📦 Inserting user:", userData);
-      await User.create(userData);
-    });
-  }
-);
 
 
 
