@@ -17,7 +17,7 @@ app.use("/api/clerk", clerkMiddleware());
 
 // Custom Inngest webhook handler
 app.post("/api/inngest", async (req, res) => {
-  const event = req.body;
+  const { event } = req.body;
 
   console.log("📨 Raw incoming event:", event);
 
@@ -26,13 +26,7 @@ app.post("/api/inngest", async (req, res) => {
   }
 
   try {
-    await inngest.send([
-      {
-        name: event.name,
-        data: event.data,
-      },
-    ]);
-
+    await inngest.send([event]);
     console.log("✅ Event sent to Inngest");
     res.status(200).json({ success: true });
   } catch (err) {
