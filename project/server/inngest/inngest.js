@@ -65,6 +65,7 @@ export const syncUserUpdate = inngest.createFunction(
 
     try {
       const fullUser = await clerk.users.getUser(minimalUser.id);
+console.log("✅ Fetched full user from Clerk:", fullUser);
 
       const updatedUserData = {
         name: `${fullUser.firstName} ${fullUser.lastName}`,
@@ -77,6 +78,8 @@ export const syncUserUpdate = inngest.createFunction(
       return { success: true };
     } catch (error) {
       console.error("❌ Error syncing user update:", error);
+      console.error("❌ Clerk SDK error:", error);
+
       throw error;
     }
   }
@@ -108,5 +111,11 @@ export const syncUserDeletion = inngest.createFunction(
   }
 );
 
+
+
 // Export all Inngest functions
 export const functions = [syncUserCreation, syncUserUpdate, syncUserDeletion];
+
+// Register all functions with Inngest
+
+inngest.register(...functions); 
