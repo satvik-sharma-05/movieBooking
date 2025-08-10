@@ -1,7 +1,7 @@
 import User from "../models/user.model.js";
 import { createClerkClient } from "@clerk/backend";
 import inngestPkg from "inngest";
-
+import connectDB from "../config/db.js";
 
 // Create Inngest client
 const { Inngest } = inngestPkg;
