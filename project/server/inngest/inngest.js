@@ -16,42 +16,53 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 export const syncUserCreation = inngest.createFunction(
   { id: "sync-user-creation", name: "Sync User Creation" },
   { event: "clerk/user.created" },
-  async ({ event }) => {
+  async ({ event, step }) => {
     console.log("📦 Incoming clerk/user.created event:", JSON.stringify(event, null, 2));
-    console.log("📨 Event data received:", event.data);
-    console.log("📦 Event name:", event.name);
-    if(!event?.data?.id){
-        throw new Error("Missing user ID in event data");
-    }
+
     const minimalUser = event.data;
-    if (!minimalUser || !minimalUser.id) {
+    if (!minimalUser?.id) {
       console.warn("⚠️ Missing user ID in event");
       return { success: false, error: "Missing user ID" };
     }
 
+    // Step: Fetch full user from Clerk
+    const fullUser = await step.run("fetch-full-user", async () => {
+      return await clerk.users.getUser(minimalUser.id);
+    });
+
+    // Extract primary email address safely
+    const email =
+      fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress || "";
+
+    // Fallback to minimal image if needed
+    const image = fullUser.imageUrl || minimalUser.image_url || "";
+
+    // Construct user payload
+    const userData = {
+      clerkId: fullUser.id,
+      name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
+      email,
+      image,
+      createdAt: new Date(fullUser.createdAt),
+    };
+
+    // Validate required fields
+    if (!userData.clerkId || !userData.email) {
+      console.warn("⚠️ Incomplete user data:", userData);
+      return { success: false, error: "Missing required fields" };
+    }
+
+    // Insert into MongoDB
     try {
-      const fullUser = await clerk.users.getUser(minimalUser.id);
-
-      const email = fullUser.emailAddresses?.[0]?.emailAddress || "";
-      const image = fullUser.imageUrl || minimalUser.image_url || "";
-
-      const userData = {
-        clerkId: fullUser.id,
-        name: `${fullUser.firstName} ${fullUser.lastName}`,
-        email,
-        image,
-      };
-
       await User.create(userData);
       console.log("✅ User created successfully:", userData);
-      return { success: true };
+      return { success: true, userId: fullUser.id };
     } catch (error) {
-      console.error("❌ Error syncing user creation:", error);
-      throw error;
+      console.error("❌ Error inserting user into MongoDB:", error);
+      return { success: false, error: error.message };
     }
   }
 );
-
 
 
 export const handleUserCreated = inngest.createFunction(
