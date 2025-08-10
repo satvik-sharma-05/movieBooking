@@ -20,13 +20,17 @@ app.use("/api/clerk", clerkMiddleware());
 // Custom Inngest webhook handler
 app.post("/api/inngest", async (req, res) => {
   const rawBody = req.body;
-  const event = rawBody?.event || rawBody;
 
   console.log("📦 Full incoming body:", rawBody);
-  console.log("📨 Parsed event:", event);
 
-  if (!event?.name || !event?.data) {
-    return res.status(400).json({ error: "Invalid event structure", body: rawBody });
+  // Manually construct the event
+  const event = {
+    name: "clerk/user.created", // or dynamically infer from headers or payload
+    data: rawBody.data,
+  };
+
+  if (!event?.data) {
+    return res.status(400).json({ error: "Missing event data", body: rawBody });
   }
 
   try {
