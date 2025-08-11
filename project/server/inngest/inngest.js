@@ -53,6 +53,10 @@ export const syncUserCreation = inngest.createFunction(
       console.error("❌ Failed to fetch user from Clerk:", error.message, error.stack);
       return { success: false, error: "Clerk user fetch failed" };
     }
+    if (!fullUser || !fullUser.id || !fullUser.emailAddresses?.length) {
+  console.warn("⚠️ Clerk returned incomplete user:", fullUser);
+  return { success: false, error: "Incomplete Clerk user" };
+}
 
     // Extract email with fallback
     const email =

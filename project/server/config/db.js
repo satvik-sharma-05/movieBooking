@@ -1,18 +1,36 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
+
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
 
 const connectDB = async () => {
   console.log("🛠 Attempting MongoDB connection...");
 
-  try {
-    mongoose.set('strictQuery', false);
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log("✅ MongoDB connected successfully");
-  } catch (error) {
-    console.error("❌ MongoDB connection failed:", error.message);
-    process.exit(1);
+  if (cached.conn) {
+    console.log("🔁 Reusing existing MongoDB connection");
+    return cached.conn;
   }
 
-  mongoose.connection.on('error', (err) => {
+  if (!cached.promise) {
+    mongoose.set("strictQuery", false);
+    cached.promise = mongoose.connect(process.env.MONGODB_URI, {
+      bufferCommands: false,
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+    console.log("✅ MongoDB connected successfully");
+    return cached.conn;
+  } catch (error) {
+    console.error("❌ MongoDB connection failed:", error.message);
+    throw error;
+  }
+
+  mongoose.connection.on("error", (err) => {
     console.error("🔥 MongoDB connection error:", err.message);
   });
 };
