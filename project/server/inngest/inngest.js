@@ -52,7 +52,7 @@ export const syncUserCreation = inngest.createFunction(
     const email =
       fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
       fullUser.emailAddresses?.[0]?.emailAddress ||
-      `${fullUser.id}@clerk.temp`; // Fallback email if none found
+      `${fullUser.id}@clerk.temp`; // Fallback email
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
       console.warn("⚠️ No valid email found for user:", fullUser.id, "using fallback:", email);
       return { success: false, error: "No valid email address" };

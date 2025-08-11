@@ -53,8 +53,13 @@ app.post("/test-sync", async (req, res) => {
 app.use("/api/inngest", (req, res, next) => {
   console.log("Inngest request received:", req.method, req.url, req.headers);
   console.log("Request body:", JSON.stringify(req.body, null, 2));
+  const originalJson = res.json;
+  res.json = function (body) {
+    console.log("Response:", JSON.stringify(body, null, 2));
+    originalJson.call(this, body);
+  };
   next();
-}, serve({ client: inngest, functions }));
+}, serve({ client: inngest, functions }));  
 
 // Clerk middleware (exclude /api/inngest)
 app.use(clerkMiddleware({ ignoredRoutes: ["/api/inngest"] }));
