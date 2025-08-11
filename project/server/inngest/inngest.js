@@ -38,9 +38,9 @@ export const syncUserCreation = inngest.createFunction(
   async ({ event, step }) => {
     const DEBUG = true;
 
-    const log = (...args: any[]) => DEBUG && console.log(...args);
-    const warn = (...args: any[]) => DEBUG && console.warn(...args);
-    const errorLog = (...args: any[]) => console.error(...args);
+    const log = (...args) => DEBUG ? console.log.apply(console, args) : undefined;
+const warn = (...args) => DEBUG ? console.warn.apply(console, args) : undefined;
+const errorLog = (...args) => console.error.apply(console, args);
 
     log("📦 Incoming event:", JSON.stringify(event, null, 2));
 
