@@ -3,6 +3,9 @@ import { createClerkClient } from "@clerk/backend";
 import inngestPkg from "inngest";
 import connectDB from "../config/db.js";
 import dotenv from "dotenv";
+
+import { Inngest } from "inngest";
+
 dotenv.config({
   path: "C:/Users/sharm/OneDrive/Desktop/movieBooking/project/server/.env",
 });
