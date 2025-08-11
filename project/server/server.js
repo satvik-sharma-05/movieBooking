@@ -59,7 +59,7 @@ app.use("/api/inngest", (req, res, next) => {
     originalJson.call(this, body);
   };
   next();
-}, serve({ client: inngest, functions }));  
+}, serve({ client: inngest, functions }));
 
 // Clerk middleware (exclude /api/inngest)
 app.use(clerkMiddleware({ ignoredRoutes: ["/api/inngest"] }));
