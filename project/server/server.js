@@ -61,6 +61,7 @@ app.use("/api/inngest", (req, res, next) => {
   next();
 }, serve({ client: inngest, functions }));
 
+
 // Clerk middleware (exclude /api/inngest)
 app.use(clerkMiddleware({ ignoredRoutes: ["/api/inngest"] }));
 app.use("/api/clerk", clerkMiddleware());

@@ -25,7 +25,6 @@ export const syncUserCreation = inngest.createFunction(
   { event: "user.created" },
   async ({ event, step }) => {
     console.log("📦 Incoming user.created event:", JSON.stringify(event, null, 2));
-
     if (
       !["user.created", "clerk/user.created", "clerk/user.updated"].includes(event.name) ||
       event.data?.object !== "user"
@@ -54,9 +53,9 @@ export const syncUserCreation = inngest.createFunction(
     const email =
       fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
       fullUser.emailAddresses?.[0]?.emailAddress ||
-      `${fullUser.id}@clerk.temp`;
+      (fullUser.primaryEmailAddressId ? `${fullUser.primaryEmailAddressId.split("_")[1]}@clerk.temp` : `${fullUser.id}@clerk.temp`);
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      console.warn("⚠️ No valid email found for user:", fullUser.id, "using fallback:", email);
+      console.warn("⚠️ No valid email found for user:", fullUser.id, "using fallback:", email, "fullUser:", JSON.stringify(fullUser, null, 2));
       return { success: false, error: "No valid email address" };
     }
     console.log("📧 Extracted email:", email);
