@@ -24,15 +24,15 @@ export const syncUserCreation = inngest.createFunction(
   { id: "sync-user-creation", name: "Sync User Creation" },
   { event: "user.created" },
   async ({ event, step }) => {
-    console.log("📦 Incoming user.created event:", JSON.stringify(event, null, 2));
+    console.log("📦 Incoming event:", JSON.stringify(event, null, 2));
     if (
       !["user.created", "clerk/user.created", "clerk/user.updated"].includes(event.name) ||
       event.data?.object !== "user"
     ) {
-      console.warn("⚠️ Invalid event structure:", { name: event?.name, object: event?.data?.object });
-      return { success: false, error: "Invalid Clerk webhook payload" };
+      console.warn("⚠️ Skipping non-user event:", { name: event.name, object: event.data?.object });
+      return { success: false, error: "Non-user event received" };
     }
-    console.log("✅ Event structure validated");
+    console.log("✅ Event structure validated for user processing");
 
     const minimalUser = event.data;
     if (!minimalUser?.id) {
