@@ -52,6 +52,7 @@ app.post("/test-sync", async (req, res) => {
 // 🔔 Inngest webhook handler with logging
 app.use("/api/inngest", (req, res, next) => {
   console.log("Inngest request received:", req.method, req.url, req.headers);
+  console.log("Request body:", JSON.stringify(req.body, null, 2));
   next();
 }, serve({ client: inngest, functions }));
 
