@@ -91,6 +91,7 @@ export const syncUserCreation = inngest.createFunction(
       return { success: false, error: error.message };
     }
   }
+);
 
 /**
  * 🔄 Sync user updates from Clerk to your database
