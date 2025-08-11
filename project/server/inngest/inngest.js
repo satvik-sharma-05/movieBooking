@@ -33,12 +33,14 @@ export const syncUserCreation = inngest.createFunction(
       console.warn("⚠️ Invalid event structure:", { name: event?.name, object: event?.data?.object });
       return { success: false, error: "Invalid Clerk webhook payload" };
     }
+    console.log("✅ Event structure validated");
 
     const minimalUser = event.data;
     if (!minimalUser?.id) {
       console.warn("⚠️ Missing user ID in event");
       return { success: false, error: "Missing user ID" };
     }
+    console.log("✅ User ID validated:", minimalUser.id);
 
     let fullUser;
     try {
@@ -72,8 +74,8 @@ export const syncUserCreation = inngest.createFunction(
       console.warn("⚠️ Incomplete user data:", userData);
       return { success: false, error: "Missing required fields" };
     }
+    console.log("✅ User data constructed:", JSON.stringify(userData, null, 2));
 
-    console.log("📦 Final userData:", JSON.stringify(userData, null, 2));
     await connectDB();
     console.log("🧠 DB connected inside Inngest function");
 
