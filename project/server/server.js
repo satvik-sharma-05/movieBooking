@@ -50,8 +50,8 @@ app.post("/test-sync", async (req, res) => {
   console.log("🧪 /test-sync route hit - END");
 });
 
-// 🔔 Inngest webhook handler with logging
-app.use("/api/inngest", serve({ client: inngest, functions }));
+  // 🔔 Inngest webhook handler with logging
+  app.use("/api/inngest", serve({ client: inngest, functions }));
 
 
 // Clerk middleware (exclude /api/inngest)
@@ -63,6 +63,13 @@ app.get("/", (_, res) => res.send("Server is Live!"));
 app.get("/favicon.ico", (_, res) => res.status(204).end());
 
 // Vercel serverless handler (remove local listen for production)
+
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
+  });
+}
+
 export default (req, res) => {
   app(req, res);
 };

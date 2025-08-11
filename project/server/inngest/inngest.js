@@ -11,14 +11,14 @@ dotenv.config({
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 // Create Inngest client
-const { Inngest } = inngestPkg;
-console.log("🚀 Inngest client initialized with:", Object.keys(inngestPkg));
 const inngest = new Inngest({
   id: "my-app",
   name: "movie-booking-server",
   eventKey: process.env.INNGEST_EVENT_KEY,
   signingKey: process.env.INNGEST_SIGNING_KEY,
-  baseUrl: process.env.NODE_ENV === "production" ? "https://inn.gs" : "http://localhost:8288",
+  baseUrl: process.env.NODE_ENV === "production"
+    ? "https://inn.gs"
+    : "http://localhost:8288", // or omit this line entirely to default to cloud
 });
 
 
