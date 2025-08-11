@@ -44,7 +44,7 @@ const warn = (...args) => DEBUG ? console.warn.apply(console, args) : undefined;
 const errorLog = (...args) => console.error.apply(console, args);
 
     log("📦 Incoming event:", JSON.stringify(event, null, 2));
-cccccc
+
     // Connect to DB
     try {
       await connectDB();
