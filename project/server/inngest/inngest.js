@@ -25,6 +25,8 @@ export const syncUserCreation = inngest.createFunction(
   { event: "user.created" },
   async ({ event, step }) => {
     console.log("📦 Incoming event:", JSON.stringify(event, null, 2));
+
+    // Validate event type and object
     if (
       !["user.created", "clerk/user.created", "clerk/user.updated"].includes(event.name) ||
       event.data?.object !== "user"
@@ -34,6 +36,7 @@ export const syncUserCreation = inngest.createFunction(
     }
     console.log("✅ Event structure validated for user processing");
 
+    // Extract minimal user
     const minimalUser = event.data;
     if (!minimalUser?.id) {
       console.warn("⚠️ Missing user ID in event");
@@ -41,6 +44,7 @@ export const syncUserCreation = inngest.createFunction(
     }
     console.log("✅ User ID validated:", minimalUser.id);
 
+    // Fetch full user from Clerk
     let fullUser;
     try {
       fullUser = await clerk.users.getUser(minimalUser.id);
@@ -50,23 +54,29 @@ export const syncUserCreation = inngest.createFunction(
       return { success: false, error: "Clerk user fetch failed" };
     }
 
+    // Extract email with fallback
     const email =
       fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
       fullUser.emailAddresses?.[0]?.emailAddress ||
-      (fullUser.primaryEmailAddressId ? `${fullUser.primaryEmailAddressId.split("_")[1]}@clerk.temp` : `${fullUser.id}@clerk.temp`);
+      (fullUser.primaryEmailAddressId
+        ? `${fullUser.primaryEmailAddressId.split("_")[1]}@clerk.temp`
+        : `${fullUser.id}@clerk.temp`);
+
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      console.warn("⚠️ No valid email found for user:", fullUser.id, "using fallback:", email, "fullUser:", JSON.stringify(fullUser, null, 2));
+      console.warn("⚠️ No valid email found for user:", fullUser.id, "using fallback:", email);
       return { success: false, error: "No valid email address" };
     }
     console.log("📧 Extracted email:", email);
 
-    const image = fullUser.imageUrl || "https://default.image/url.png";
+    // Construct user data
     const userData = {
       clerkId: fullUser.id,
       name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
-      email,
-      image,
+      email: email.toLowerCase(),
+      image: fullUser.imageUrl || "https://default.image/url.png",
       createdAt: new Date(fullUser.createdAt || Date.now()),
+      source: "clerk-webhook",
+      authProvider: "clerk",
     };
 
     if (!userData.clerkId || !userData.name || !userData.email || !userData.image) {
@@ -75,17 +85,23 @@ export const syncUserCreation = inngest.createFunction(
     }
     console.log("✅ User data constructed:", JSON.stringify(userData, null, 2));
 
+    // Connect to DB
     await connectDB();
     console.log("🧠 DB connected inside Inngest function");
 
+    // Upsert user with retryable step
     try {
-      const result = await User.findOneAndUpdate(
-        { clerkId: userData.clerkId },
-        { $set: userData },
-        { upsert: true, new: true, runValidators: true }
-      );
+      const result = await step.run("upsert-user", async () => {
+        return await User.findOneAndUpdate(
+          { clerkId: userData.clerkId },
+          { $set: userData },
+          { upsert: true, new: true, runValidators: true }
+        );
+      });
+
       if (!result) console.warn("⚠️ No document returned from MongoDB upsert");
       else console.log("✅ User synced to MongoDB:", result);
+
       return { success: true, userId: fullUser.id };
     } catch (error) {
       console.error("❌ MongoDB insert/update failed:", error.message, error.stack);
