@@ -2,6 +2,10 @@ import User from "../models/user.model.js";
 import { createClerkClient } from "@clerk/backend";
 import inngestPkg from "inngest";
 import connectDB from "../config/db.js";
+import dotenv from "dotenv";
+dotenv.config({
+  path: "C:/Users/sharm/OneDrive/Desktop/movieBooking/project/server/.env",
+});
 
 // Create Clerk client
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
@@ -16,6 +20,14 @@ const inngest = new Inngest({
   signingKey: process.env.INNGEST_SIGNING_KEY,
   baseUrl: process.env.NODE_ENV === "production" ? "https://inn.gs" : "http://localhost:8288",
 });
+
+
+
+// 🔍 Confirm env keys loaded
+console.log("🔑 Event Key:", process.env.INNGEST_EVENT_KEY);
+console.log("🔐 Signing Key:", process.env.INNGEST_SIGNING_KEY);
+console.log("Clerk secret key: ",process.env.CLERK_SECRET_KEY);
+
 
 /**
  * 🔄 Sync user creation from Clerk to your database
