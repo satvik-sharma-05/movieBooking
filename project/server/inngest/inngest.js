@@ -29,7 +29,8 @@ console.log("🔐 Signing Key:", process.env.INNGEST_SIGNING_KEY);
 console.log("Clerk secret key: ",process.env.CLERK_SECRET_KEY);
 console.log("");
 console.log("🔗 MongoDB URI:", process.env.MONGODB_URI);
-
+console.log("");
+console.log("Ingest singing key: ",process.env.INNGEST_SIGNING_KEY);
 /**
  * 🔄 Sync user creation from Clerk to your database
  */

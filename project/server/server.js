@@ -14,7 +14,7 @@ dotenv.config();
 console.log("🔑 Event Key:", process.env.INNGEST_EVENT_KEY);
 console.log("🔐 Signing Key:", process.env.INNGEST_SIGNING_KEY);
 console.log("Clerk secret key: ",process.env.CLERK_SECRET_KEY);
-
+console.log("Ingest signig key: ",process.env.INNGEST_SIGNING_KEY);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -51,16 +51,7 @@ app.post("/test-sync", async (req, res) => {
 });
 
 // 🔔 Inngest webhook handler with logging
-app.use("/api/inngest", (req, res, next) => {
-  console.log("Inngest request received:", req.method, req.url, req.headers);
-  console.log("Request body:", JSON.stringify(req.body, null, 2));
-  const originalJson = res.json;
-  res.json = function (body) {
-    console.log("Response:", JSON.stringify(body, null, 2));
-    originalJson.call(this, body);
-  };
-  next();
-}, serve({ client: inngest, functions }));
+app.use("/api/inngest", serve({ client: inngest, functions }));
 
 
 // Clerk middleware (exclude /api/inngest)
