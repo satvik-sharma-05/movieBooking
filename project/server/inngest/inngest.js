@@ -27,7 +27,7 @@ const inngest = new Inngest({
 console.log("🔑 Event Key:", process.env.INNGEST_EVENT_KEY);
 console.log("🔐 Signing Key:", process.env.INNGEST_SIGNING_KEY);
 console.log("Clerk secret key: ",process.env.CLERK_SECRET_KEY);
-
+console.log("🔗 MongoDB URI:", process.env.MONGODB_URI?.split("@")[1]);
 
 /**
  * 🔄 Sync user creation from Clerk to your database
@@ -36,55 +36,67 @@ export const syncUserCreation = inngest.createFunction(
   { id: "sync-user-creation", name: "Sync User Creation" },
   { event: "user.created" },
   async ({ event, step }) => {
-    console.log("📦 Incoming event:", JSON.stringify(event, null, 2));
+    const DEBUG = true;
+
+    const log = (...args: any[]) => DEBUG && console.log(...args);
+    const warn = (...args: any[]) => DEBUG && console.warn(...args);
+    const errorLog = (...args: any[]) => console.error(...args);
+
+    log("📦 Incoming event:", JSON.stringify(event, null, 2));
+
     // Connect to DB
-    await connectDB();
-    console.log("🧠 DB connected inside Inngest function");
+    try {
+      await connectDB();
+      log("🧠 DB connected inside Inngest function");
+    } catch (err) {
+      errorLog("❌ DB connection failed:", err.message);
+      return { success: false, error: "DB connection failed" };
+    }
+
     // Validate event type and object
     if (
       !["user.created", "clerk/user.created", "clerk/user.updated"].includes(event.name) ||
       event.data?.object !== "user"
     ) {
-      console.warn("⚠️ Skipping non-user event:", { name: event.name, object: event.data?.object });
+      warn("⚠️ Skipping non-user event:", { name: event.name, object: event.data?.object });
       return { success: false, error: "Non-user event received" };
     }
-    console.log("✅ Event structure validated for user processing");
 
-    // Extract minimal user
     const minimalUser = event.data;
     if (!minimalUser?.id) {
-      console.warn("⚠️ Missing user ID in event");
+      warn("⚠️ Missing user ID in event");
       return { success: false, error: "Missing user ID" };
     }
-    console.log("✅ User ID validated:", minimalUser.id);
+
+    log("✅ User ID validated:", minimalUser.id);
 
     // Fetch full user from Clerk
     let fullUser;
     try {
       fullUser = await clerk.users.getUser(minimalUser.id);
-      console.log("✅ Fetched full user from Clerk:", JSON.stringify(fullUser, null, 2));
-    } catch (error) {
-      console.error("❌ Failed to fetch user from Clerk:", error.message, error.stack);
+      log("✅ Fetched full user from Clerk:", JSON.stringify(fullUser, null, 2));
+    } catch (err) {
+      errorLog("❌ Failed to fetch user from Clerk:", err.message);
       return { success: false, error: "Clerk user fetch failed" };
     }
+
     if (!fullUser || !fullUser.id || !fullUser.emailAddresses?.length) {
-      console.warn("⚠️ Clerk returned incomplete user:", fullUser);
+      warn("⚠️ Clerk returned incomplete user:", fullUser);
       return { success: false, error: "Incomplete Clerk user" };
     }
 
-    // Extract email with fallback
+    // Extract email
     const email =
       fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
       fullUser.emailAddresses?.[0]?.emailAddress ||
-      (fullUser.primaryEmailAddressId
-        ? `${fullUser.primaryEmailAddressId.split("_")[1]}@clerk.temp`
-        : `${fullUser.id}@clerk.temp`);
+      `${fullUser.id}@clerk.temp`;
 
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      console.warn("⚠️ No valid email found for user:", fullUser.id, "using fallback:", email);
+      warn("⚠️ No valid email found for user:", fullUser.id, "using fallback:", email);
       return { success: false, error: "No valid email address" };
     }
-    console.log("📧 Extracted email:", email);
+
+    log("📧 Extracted email:", email);
 
     // Construct user data
     const userData = {
@@ -98,14 +110,13 @@ export const syncUserCreation = inngest.createFunction(
     };
 
     if (!userData.clerkId || !userData.name || !userData.email || !userData.image) {
-      console.warn("⚠️ Incomplete user data:", userData);
+      warn("⚠️ Incomplete user data:", userData);
       return { success: false, error: "Missing required fields" };
     }
-    console.log("✅ User data constructed:", JSON.stringify(userData, null, 2));
 
+    log("✅ User data constructed:", JSON.stringify(userData, null, 2));
 
-
-    // Upsert user with retryable step
+    // Upsert user
     try {
       const result = await step.run("upsert-user", async () => {
         return await User.findOneAndUpdate(
@@ -115,13 +126,16 @@ export const syncUserCreation = inngest.createFunction(
         );
       });
 
-      if (!result) console.warn("⚠️ No document returned from MongoDB upsert");
-      else console.log("✅ User synced to MongoDB:", result);
+      if (!result) {
+        warn("⚠️ No document returned from MongoDB upsert");
+        return { success: false, error: "MongoDB upsert returned null" };
+      }
 
+      log("✅ User synced to MongoDB:", result);
       return { success: true, userId: fullUser.id };
-    } catch (error) {
-      console.error("❌ MongoDB insert/update failed:", error.message, error.stack);
-      return { success: false, error: error.message };
+    } catch (err) {
+      errorLog("❌ MongoDB insert/update failed:", err.message);
+      return { success: false, error: err.message };
     }
   }
 );

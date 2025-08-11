@@ -14,6 +14,7 @@ dotenv.config();
 console.log("🔑 Event Key:", process.env.INNGEST_EVENT_KEY);
 console.log("🔐 Signing Key:", process.env.INNGEST_SIGNING_KEY);
 console.log("Clerk secret key: ",process.env.CLERK_SECRET_KEY);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
