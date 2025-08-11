@@ -25,7 +25,9 @@ export const syncUserCreation = inngest.createFunction(
   { event: "user.created" },
   async ({ event, step }) => {
     console.log("📦 Incoming event:", JSON.stringify(event, null, 2));
-
+    // Connect to DB
+    await connectDB();
+    console.log("🧠 DB connected inside Inngest function");
     // Validate event type and object
     if (
       !["user.created", "clerk/user.created", "clerk/user.updated"].includes(event.name) ||
@@ -54,9 +56,9 @@ export const syncUserCreation = inngest.createFunction(
       return { success: false, error: "Clerk user fetch failed" };
     }
     if (!fullUser || !fullUser.id || !fullUser.emailAddresses?.length) {
-  console.warn("⚠️ Clerk returned incomplete user:", fullUser);
-  return { success: false, error: "Incomplete Clerk user" };
-}
+      console.warn("⚠️ Clerk returned incomplete user:", fullUser);
+      return { success: false, error: "Incomplete Clerk user" };
+    }
 
     // Extract email with fallback
     const email =
@@ -89,9 +91,7 @@ export const syncUserCreation = inngest.createFunction(
     }
     console.log("✅ User data constructed:", JSON.stringify(userData, null, 2));
 
-    // Connect to DB
-    await connectDB();
-    console.log("🧠 DB connected inside Inngest function");
+
 
     // Upsert user with retryable step
     try {
