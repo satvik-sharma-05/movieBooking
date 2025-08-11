@@ -27,7 +27,8 @@ const inngest = new Inngest({
 console.log("🔑 Event Key:", process.env.INNGEST_EVENT_KEY);
 console.log("🔐 Signing Key:", process.env.INNGEST_SIGNING_KEY);
 console.log("Clerk secret key: ",process.env.CLERK_SECRET_KEY);
-console.log("🔗 MongoDB URI:", process.env.MONGODB_URI?.split("@")[1]);
+console.log("");
+console.log("🔗 MongoDB URI:", process.env.MONGODB_URI);
 
 /**
  * 🔄 Sync user creation from Clerk to your database
@@ -43,7 +44,7 @@ const warn = (...args) => DEBUG ? console.warn.apply(console, args) : undefined;
 const errorLog = (...args) => console.error.apply(console, args);
 
     log("📦 Incoming event:", JSON.stringify(event, null, 2));
-
+cccccc
     // Connect to DB
     try {
       await connectDB();
