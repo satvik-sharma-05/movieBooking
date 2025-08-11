@@ -23,7 +23,6 @@ app.use(cors());
 // ✅ Connect to MongoDB
 await connectDB();
 
-
 // 🧪 Local test route to simulate Clerk webhook
 app.post("/test-sync", async (req, res) => {
   console.log("🧪 /test-sync route hit - START");
@@ -50,50 +49,21 @@ app.post("/test-sync", async (req, res) => {
   console.log("🧪 /test-sync route hit - END");
 });
 
-
+// 🔔 Inngest webhook handler with logging
 app.use("/api/inngest", (req, res, next) => {
   console.log("Inngest request received:", req.method, req.url, req.headers);
   next();
 }, serve({ client: inngest, functions }));
 
+// Clerk middleware (exclude /api/inngest)
 app.use(clerkMiddleware({ ignoredRoutes: ["/api/inngest"] }));
 app.use("/api/clerk", clerkMiddleware());
-
-// 🔔 Inngest webhook handler
-app.post("/api/inngest", async (req, res) => {
-  const rawBody = req.body;
-  console.log("📦 Incoming Clerk webhook:", JSON.stringify(rawBody, null, 2));
-
-  if (!rawBody?.type || !rawBody?.data) {
-    console.warn("⚠️ Invalid Clerk webhook payload");
-    return res.status(400).json({ error: "Invalid Clerk webhook payload" });
-  }
-
-  const event = {
-    name: rawBody.type,
-    data: rawBody.data,
-  };
-
-  try {
-    const result = await inngest.send([event]);
-    console.log("✅ Event sent to Inngest:", result);
-    res.status(200).json({ success: true, result });
-  } catch (err) {
-    console.error("❌ Failed to send event to Inngest:", err.message);
-    res.status(500).json({ error: err.message || "Failed to send event" });
-  }
-});
-
-
-
-
 
 // ✅ Health check
 app.get("/", (_, res) => res.send("Server is Live!"));
 app.get("/favicon.ico", (_, res) => res.status(204).end());
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running at http://localhost:${PORT}`);
-});
-
-export default app;
+// Vercel serverless handler (remove local listen for production)
+export default (req, res) => {
+  app(req, res);
+};
