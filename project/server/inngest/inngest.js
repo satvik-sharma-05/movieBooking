@@ -34,7 +34,7 @@ console.log("🔗 MongoDB URI:", process.env.MONGODB_URI?.split("@")[1]);
  */
 export const syncUserCreation = inngest.createFunction(
   { id: "sync-user-creation", name: "Sync User Creation" },
-  { event: "user.created" },
+  { event: "clerk/user.created" },
   async ({ event, step }) => {
     const DEBUG = true;
 
