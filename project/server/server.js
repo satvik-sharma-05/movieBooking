@@ -109,7 +109,8 @@ app.post("/test-sync", async (req, res) => {
 app.use("/api/inngest", serve({
   client: inngest,
   functions,
-  signingKey: process.env.INNGEST_SIGNING_KEY
+  signingKey: process.env.INNGEST_SIGNING_KEY, // Crucial for production
+  middleware: [clerkMiddleware] // Optional but recommended
 }));
 
 // Clerk middleware (exclude webhook and Inngest endpoints)
