@@ -1,243 +1,323 @@
 import User from "../models/user.model.js";
 import { createClerkClient } from "@clerk/backend";
-import inngestPkg from "inngest";
+import { Inngest } from "inngest";
 import connectDB from "../config/db.js";
 import dotenv from "dotenv";
 
-import { Inngest } from "inngest";
+// Load environment variables
+dotenv.config();
 
-dotenv.config({
-  path: "C:/Users/sharm/OneDrive/Desktop/movieBooking/project/server/.env",
+// Initialize Clerk client
+const clerk = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY
 });
 
-// Create Clerk client
-const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
-
-// Create Inngest client
+// Initialize Inngest
 const inngest = new Inngest({
-  id: "my-app",
-  name: "movie-booking-server",
+  id: "movie-booking-app",
+  name: "Movie Booking Server",
   eventKey: process.env.INNGEST_EVENT_KEY,
   signingKey: process.env.INNGEST_SIGNING_KEY,
-  baseUrl: process.env.NODE_ENV === "production"
-    ? "https://inn.gs"
-    : "http://localhost:8288", // or omit this line entirely to default to cloud
+  baseUrl: process.env.NODE_ENV === "production" 
+    ? "https://inn.gs" 
+    : "http://localhost:8288"
 });
 
+// Enhanced logger with context
+const createLogger = (context) => ({
+  log: (...args) => console.log(`[${new Date().toISOString()}] [${context}]`, ...args),
+  warn: (...args) => console.warn(`[${new Date().toISOString()}] [${context}] WARN:`, ...args),
+  error: (...args) => console.error(`[${new Date().toISOString()}] [${context}] ERROR:`, ...args),
+  debug: (...args) => process.env.DEBUG === "true" ? 
+    console.debug(`[${new Date().toISOString()}] [${context}] DEBUG:`, ...args) : null
+});
 
+// Helper function to validate user data
+const validateUserData = (userData) => {
+  if (!userData?.id) throw new Error("Missing user ID");
+  if (!userData?.email_addresses?.length) throw new Error("No email addresses found");
+  return true;
+};
 
-// 🔍 Confirm env keys loaded
-console.log("🔑 Event Key:", process.env.INNGEST_EVENT_KEY);
-console.log("🔐 Signing Key:", process.env.INNGEST_SIGNING_KEY);
-console.log("Clerk secret key: ",process.env.CLERK_SECRET_KEY);
-console.log("");
-console.log("🔗 MongoDB URI:", process.env.MONGODB_URI);
-console.log("");
-console.log("Ingest singing key: ",process.env.INNGEST_SIGNING_KEY);
+// Helper function to get primary email
+const getPrimaryEmail = (user) => {
+  return user.email_addresses?.find(e => e.id === user.primaryEmailAddressId) || 
+         user.email_addresses?.[0];
+};
+
 /**
- * 🔄 Sync user creation from Clerk to your database
+ * Sync user creation from Clerk to database
  */
 export const syncUserCreation = inngest.createFunction(
-  { id: "sync-user-creation", name: "Sync User Creation" },
+  { 
+    id: "sync-user-creation",
+    name: "Sync User Creation",
+    retries: 3,
+    idempotency: "event.user.id" // Ensure we don't process same user multiple times
+  },
   { event: "clerk/user.created" },
   async ({ event, step }) => {
-    const DEBUG = true;
+    const log = createLogger("user-creation");
+    log.debug("Incoming event:", JSON.stringify(event, null, 2));
 
-    const log = (...args) => DEBUG ? console.log.apply(console, args) : undefined;
-const warn = (...args) => DEBUG ? console.warn.apply(console, args) : undefined;
-const errorLog = (...args) => console.error.apply(console, args);
-
-    log("📦 Incoming event:", JSON.stringify(event, null, 2));
-
-    // Connect to DB
     try {
-      await connectDB();
-      log("🧠 DB connected inside Inngest function");
-    } catch (err) {
-      errorLog("❌ DB connection failed:", err.message);
-      return { success: false, error: "DB connection failed" };
-    }
+      // Validate event data
+      validateUserData(event.data);
 
-    // Validate event type and object
-    if (
-      !["user.created", "clerk/user.created", "clerk/user.updated"].includes(event.name) ||
-      event.data?.object !== "user"
-    ) {
-      warn("⚠️ Skipping non-user event:", { name: event.name, object: event.data?.object });
-      return { success: false, error: "Non-user event received" };
-    }
-
-    const minimalUser = event.data;
-    if (!minimalUser?.id) {
-      warn("⚠️ Missing user ID in event");
-      return { success: false, error: "Missing user ID" };
-    }
-
-    log("✅ User ID validated:", minimalUser.id);
-
-    // Fetch full user from Clerk
-    let fullUser;
-    try {
-      fullUser = await clerk.users.getUser(minimalUser.id);
-      log("✅ Fetched full user from Clerk:", JSON.stringify(fullUser, null, 2));
-    } catch (err) {
-      errorLog("❌ Failed to fetch user from Clerk:", err.message);
-      return { success: false, error: "Clerk user fetch failed" };
-    }
-
-    if (!fullUser || !fullUser.id || !fullUser.emailAddresses?.length) {
-      warn("⚠️ Clerk returned incomplete user:", fullUser);
-      return { success: false, error: "Incomplete Clerk user" };
-    }
-
-    // Extract email
-    const email =
-      fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
-      fullUser.emailAddresses?.[0]?.emailAddress ||
-      `${fullUser.id}@clerk.temp`;
-
-    if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
-      warn("⚠️ No valid email found for user:", fullUser.id, "using fallback:", email);
-      return { success: false, error: "No valid email address" };
-    }
-
-    log("📧 Extracted email:", email);
-
-    // Construct user data
-    const userData = {
-      clerkId: fullUser.id,
-      name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
-      email: email.toLowerCase(),
-      image: fullUser.imageUrl || "https://default.image/url.png",
-      createdAt: new Date(fullUser.createdAt || Date.now()),
-      source: "clerk-webhook",
-      authProvider: "clerk",
-    };
-
-    if (!userData.clerkId || !userData.name || !userData.email || !userData.image) {
-      warn("⚠️ Incomplete user data:", userData);
-      return { success: false, error: "Missing required fields" };
-    }
-
-    log("✅ User data constructed:", JSON.stringify(userData, null, 2));
-
-    // Upsert user
-    try {
-      const result = await step.run("upsert-user", async () => {
-        return await User.findOneAndUpdate(
-          { clerkId: userData.clerkId },
-          { $set: userData },
-          { upsert: true, new: true, runValidators: true }
-        );
+      // Connect to DB
+      await step.run("db-connect", async () => {
+        try {
+          await connectDB();
+          log.log("Database connected successfully");
+        } catch (err) {
+          log.error("Database connection failed:", err);
+          throw err;
+        }
       });
 
-      if (!result) {
-        warn("⚠️ No document returned from MongoDB upsert");
-        return { success: false, error: "MongoDB upsert returned null" };
+      // Get full user data from Clerk
+      const fullUser = await step.run("get-clerk-user", async () => {
+        try {
+          const user = await clerk.users.getUser(event.data.id);
+          log.debug("Fetched user from Clerk:", JSON.stringify(user, null, 2));
+          return user;
+        } catch (err) {
+          log.error("Failed to fetch user from Clerk:", err);
+          throw err;
+        }
+      });
+
+      // Prepare user data
+      const primaryEmail = getPrimaryEmail(fullUser);
+      if (!primaryEmail?.emailAddress) {
+        throw new Error("No valid email address found");
       }
 
-      log("✅ User synced to MongoDB:", result);
-      return { success: true, userId: fullUser.id };
-    } catch (err) {
-      errorLog("❌ MongoDB insert/update failed:", err.message);
-      return { success: false, error: err.message };
-    }
-  }
-);
-
-/**
- * 🔄 Sync user updates from Clerk to your database
- */
-export const syncUserUpdate = inngest.createFunction(
-  { id: "sync-user-update", name: "Sync User Update" },
-  { event: "user.updated" },
-  async ({ event }) => {
-    console.log("📦 Incoming clerk/user.updated event:", JSON.stringify(event, null, 2));
-
-    const minimalUser = event.data;
-    if (!minimalUser || !minimalUser.id) {
-      console.warn("⚠️ Missing user ID in event");
-      return { success: false, error: "Missing user ID" };
-    }
-
-    await connectDB();
-
-    try {
-      const fullUser = await clerk.users.getUser(minimalUser.id);
-      console.log("✅ Fetched full user from Clerk:", JSON.stringify(fullUser, null, 2));
-
-      const email =
-        fullUser.emailAddresses?.find(e => e.id === fullUser.primaryEmailAddressId)?.emailAddress ||
-        minimalUser.email_addresses?.[0]?.email_address ||
-        "unknown@example.com";
-
-      if (email === "unknown@example.com") {
-        console.warn("⚠️ No valid email found for user:", fullUser.id);
-      }
-
-      const image = fullUser.imageUrl || minimalUser.image_url || "https://default.image/url.png";
-
-      const updatedUserData = {
-        name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim(),
-        email,
-        image,
+      const userData = {
+        clerkId: fullUser.id,
+        name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim() || "Anonymous",
+        email: primaryEmail.emailAddress.toLowerCase(),
+        image: fullUser.imageUrl || "/default-avatar.png",
+        emailVerified: primaryEmail.verification?.status === "verified",
+        createdAt: new Date(fullUser.createdAt),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+        metadata: {
+          signUpMethod: fullUser.externalAccounts?.length ? "oauth" : "email",
+          externalAccounts: fullUser.externalAccounts?.map(acc => ({
+            provider: acc.provider,
+            id: acc.providerUserId
+          }))
+        }
       };
 
-      console.log("📦 Final updatedUserData:", updatedUserData);
+      // Upsert user in database
+      const result = await step.run("upsert-user", async () => {
+        try {
+          const doc = await User.findOneAndUpdate(
+            { clerkId: userData.clerkId },
+            { $set: userData },
+            { 
+              upsert: true, 
+              new: true, 
+              runValidators: true,
+              setDefaultsOnInsert: true 
+            }
+          );
+          log.log("User upserted successfully:", doc._id);
+          return doc;
+        } catch (err) {
+          log.error("Database upsert failed:", err);
+          throw err;
+        }
+      });
 
-      const result = await User.findOneAndUpdate(
-        { clerkId: fullUser.id },
-        { $set: updatedUserData },
-        { new: true, runValidators: true }
-      );
+      return {
+        success: true,
+        userId: result._id,
+        clerkId: result.clerkId,
+        email: result.email
+      };
 
-      if (!result) {
-        console.warn("⚠️ No matching user found in MongoDB for update:", fullUser.id);
-        return { success: false, error: "User not found in DB" };
-      }
-
-      console.log("✅ User updated successfully:", result);
-      return { success: true };
     } catch (error) {
-      console.error("❌ Error syncing user update:", error.message, error.stack);
-      return { success: false, error: error.message };
+      log.error("Failed to process user creation:", error);
+      throw error;
     }
   }
 );
 
 /**
- * 🗑️ Sync user deletion from Clerk to your database
+ * Sync user updates from Clerk to database
  */
-export const syncUserDeletion = inngest.createFunction(
-  { id: "sync-user-deletion", name: "Sync User Deletion" },
-  { event: "clerk/user.deleted" },
-  async ({ event }) => {
-    console.log("📦 Incoming clerk/user.deleted event:", JSON.stringify(event, null, 2));
-
-    const minimalUser = event.data;
-    if (!minimalUser || !minimalUser.id) {
-      console.warn("⚠️ Missing user ID in event");
-      return { success: false, error: "Missing user ID" };
-    }
-
-    await connectDB();
+export const syncUserUpdate = inngest.createFunction(
+  { 
+    id: "sync-user-update",
+    name: "Sync User Updates",
+    retries: 3,
+    idempotency: "event.user.id"
+  },
+  { event: "clerk/user.updated" },
+  async ({ event, step }) => {
+    const log = createLogger("user-update");
+    log.debug("Incoming update event:", JSON.stringify(event, null, 2));
 
     try {
-      const result = await User.findOneAndDelete({ clerkId: minimalUser.id });
-      if (!result) {
-        console.warn("⚠️ No user found for deletion:", minimalUser.id);
-      } else {
-        console.log("✅ User deleted successfully:", minimalUser.id);
+      // Validate event data
+      validateUserData(event.data);
+
+      // Connect to DB
+      await step.run("db-connect", async () => {
+        try {
+          await connectDB();
+          log.log("Database connected successfully");
+        } catch (err) {
+          log.error("Database connection failed:", err);
+          throw err;
+        }
+      });
+
+      // Get full user data from Clerk
+      const fullUser = await step.run("get-clerk-user", async () => {
+        try {
+          const user = await clerk.users.getUser(event.data.id);
+          log.debug("Fetched updated user from Clerk:", JSON.stringify(user, null, 2));
+          return user;
+        } catch (err) {
+          log.error("Failed to fetch updated user from Clerk:", err);
+          throw err;
+        }
+      });
+
+      // Prepare update data
+      const primaryEmail = getPrimaryEmail(fullUser);
+      if (!primaryEmail?.emailAddress) {
+        throw new Error("No valid email address found");
       }
-      return { success: true };
+
+      const updateData = {
+        name: `${fullUser.firstName || ""} ${fullUser.lastName || ""}`.trim() || "Anonymous",
+        email: primaryEmail.emailAddress.toLowerCase(),
+        image: fullUser.imageUrl || "/default-avatar.png",
+        emailVerified: primaryEmail.verification?.status === "verified",
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+        "metadata.externalAccounts": fullUser.externalAccounts?.map(acc => ({
+          provider: acc.provider,
+          id: acc.providerUserId
+        }))
+      };
+
+      // Update user in database
+      const result = await step.run("update-user", async () => {
+        try {
+          const doc = await User.findOneAndUpdate(
+            { clerkId: fullUser.id },
+            { $set: updateData },
+            { new: true, runValidators: true }
+          );
+          
+          if (!doc) {
+            log.warn("User not found in database, creating new record");
+            return await User.create({
+              clerkId: fullUser.id,
+              ...updateData,
+              createdAt: new Date(fullUser.createdAt)
+            });
+          }
+          
+          log.log("User updated successfully:", doc._id);
+          return doc;
+        } catch (err) {
+          log.error("Database update failed:", err);
+          throw err;
+        }
+      });
+
+      return {
+        success: true,
+        userId: result._id,
+        clerkId: result.clerkId,
+        action: result.createdAt === result.updatedAt ? "created" : "updated"
+      };
+
     } catch (error) {
-      console.error("❌ Error syncing user deletion:", error.message, error.stack);
-      return { success: false, error: error.message };
+      log.error("Failed to process user update:", error);
+      throw error;
     }
   }
 );
 
-// Export all Inngest functions
-export const functions = [syncUserCreation, syncUserUpdate, syncUserDeletion];
+/**
+ * Sync user deletion from Clerk to database
+ */
+export const syncUserDeletion = inngest.createFunction(
+  { 
+    id: "sync-user-deletion",
+    name: "Sync User Deletion",
+    retries: 3
+  },
+  { event: "clerk/user.deleted" },
+  async ({ event, step }) => {
+    const log = createLogger("user-deletion");
+    log.debug("Incoming deletion event:", JSON.stringify(event, null, 2));
+
+    try {
+      if (!event.data?.id) {
+        throw new Error("Missing user ID in deletion event");
+      }
+
+      // Connect to DB
+      await step.run("db-connect", async () => {
+        try {
+          await connectDB();
+          log.log("Database connected successfully");
+        } catch (err) {
+          log.error("Database connection failed:", err);
+          throw err;
+        }
+      });
+
+      // Delete user from database
+      const result = await step.run("delete-user", async () => {
+        try {
+          const doc = await User.findOneAndDelete({ clerkId: event.data.id });
+          
+          if (!doc) {
+            log.warn("User not found in database during deletion");
+            return { deleted: false };
+          }
+          
+          log.log("User deleted successfully:", doc._id);
+          return { deleted: true, userId: doc._id };
+        } catch (err) {
+          log.error("Database deletion failed:", err);
+          throw err;
+        }
+      });
+
+      // Optionally: Archive data instead of hard delete
+      // await User.updateOne(
+      //   { clerkId: event.data.id },
+      //   { $set: { deleted: true, deletedAt: new Date() } }
+      // );
+
+      return {
+        success: true,
+        ...result
+      };
+
+    } catch (error) {
+      log.error("Failed to process user deletion:", error);
+      throw error;
+    }
+  }
+);
+
+// Export all functions
+export const functions = [
+  syncUserCreation,
+  syncUserUpdate,
+  syncUserDeletion
+];
 
 export { inngest };
